@@ -50,8 +50,6 @@ rifs <- cmdb_data_filtred$unit$rifs
 adminit <- cmdb_data_filtred$unit$adminit
 rifs_df <- distinct(do.call(rbind, rifs))
 adminit_df <- distinct(do.call(rbind, adminit))
-#rifs_df$fonction <- "rifs"
-#adminit_df$fonction <- "adminit"
 mix_rifs_adminit <- distinct(rbind(rifs_df, adminit_df))
 for (i in 1:nrow(mix_rifs_adminit)) {
     sciper <- mix_rifs_adminit$sciper[i]
@@ -62,76 +60,48 @@ for (i in 1:nrow(mix_rifs_adminit)) {
 }
 
 # Serveur_Personne table -> old
-for (i in 1:nrow(cmdb_data_filtred)) {
-    fqdn <- cmdb_data_filtred$fqdn[i]
-    for (j in 1:nrow(mix_rifs_adminit)) {
-        sciper <- mix_rifs_adminit$sciper[j]
-        insert_serv_pers_query <- sprintf("INSERT INTO Serveur_Personne (id_serv_pers, fqdn, sciper) VALUES (NULL, '%s', '%s')", fqdn, sciper)
-        dbExecute(con_sqlite, insert_serv_pers_query)
-    }
-}
+#for (i in 1:nrow(cmdb_data_filtred)) {
+#    fqdn <- cmdb_data_filtred$fqdn[i]
+#    for (j in 1:nrow(mix_rifs_adminit)) {
+#        sciper <- mix_rifs_adminit$sciper[j]
+#        insert_serv_pers_query <- sprintf("INSERT INTO Serveur_Personne (id_serv_pers, fqdn, sciper) VALUES (NULL, '%s', '%s')", fqdn, sciper)
+#        dbExecute(con_sqlite, insert_serv_pers_query)
+#    }
+#}
 
 # Serveur_Personne table -> new
 
-# FIXME car ko pour creer table
-serveur_personne <- data.frame(fqdn = character(), sciper = numeric(), rifs_flag = numeric(), adminit_flag = numeric())
+# FIXME : pourquoi doublons lors de creation de serveur_personne (1276 lignes et 1097 sans doublons) ?
+serveur_personne <- data.frame(fqdn = character(), sciper = numeric(), rifs_flag = numeric(), adminit_flag = numeric(), stringsAsFactors = FALSE)
 for(i in 1:nrow(cmdb_data_filtred)) {
   fqdn <- cmdb_data_filtred$fqdn[i]
-  rifs <- cmdb_data_filtred$unit$rifs[i]
-  rifs_df <- data.frame()
-  if (!is.null(rifs) && length(rifs) > 0) {
-    rifs_df <- do.call(rbind, rifs)
-  }
-  adminit <- cmdb_data_filtred$unit$adminit[i]
-  adminit_df <- data.frame()
-  if (!is.null(adminit) && length(adminit) > 0) {
-    adminit_df <- do.call(rbind, adminit)
-  }
-  if (nrow(rifs_df) > 0) {
-    for(j in 1:nrow(rifs_df)) {
-      sciper <- rifs_df$sciper[j]
-      rifs_flag <- 1
-      adminit_flag <- ifelse(sciper %in% adminit_df$sciper, 1, 0)
-      l <- data.frame(fqdn = fqdn, sciper = sciper, rifs_flag = rifs_flag, adminit_flag = adminit_flag)
-      serveur_personne <- rbind(serveur_personne, l)
+  rifs <- data.frame(cmdb_data_filtred$unit$rifs[[i]], stringsAsFactors = FALSE)
+  if (nrow(rifs) > 0) {
+    for (j in 1:nrow(rifs)) {
+      new_row <- data.frame(fqdn = fqdn, sciper = rifs$sciper[j], rifs_flag = 1, adminit_flag = 0, stringsAsFactors = FALSE)
+      serveur_personne <- rbind(serveur_personne, new_row)
     }
   }
-  #if (nrow(adminit_df) > 0) { # "isTRUE(adminit_df) &&" ne fonctionne pas non plus
-  #  adminit_only <- anti_join(adminit_df, serveur_personne, by = "sciper")
-  #  if (nrow(adminit_only) > 0) {
-  #    for(j in 1:nrow(adminit_only)) {
-  #      sciper <- adminit_only$sciper[j]
-  #      rifs_flag <- 0
-  #      adminit_flag <- 1
-  #      l <- data.frame(fqdn = fqdn, sciper = sciper, rifs_flag = rifs_flag, adminit_flag = adminit_flag)
-  #      serveur_personne <- rbind(serveur_personne, l)
-  #    }
-  #  }
-  #}
+  adminit <- data.frame(cmdb_data_filtred$unit$adminit[[i]], stringsAsFactors = FALSE)
+  if (nrow(adminit) > 0) {
+    for (k in 1:nrow(adminit)) {
+      if (adminit$sciper[k] %in% serveur_personne$sciper) {
+        serveur_personne[serveur_personne$sciper == adminit$sciper[k], "adminit_flag"] <- 1
+      } else {
+        new_row <- data.frame(fqdn = fqdn, sciper = adminit$sciper[k], rifs_flag = 0, adminit_flag = 1, stringsAsFactors = FALSE)
+        serveur_personne <- rbind(serveur_personne, new_row)
+      }
+    }
+  }
 }
-
-# TODO -> rajouter distinct
-
-for (i in 1:nrow(cmdb_data_filtred)) {
-    fqdn <- cmdb_data_filtred$fqdn[i]
-    rifs <- cmdb_data_filtred$unit$rifs[i]
-    rifs_df <- distinct(do.call(rbind, rifs))
-    adminit <- cmdb_data_filtred$unit$adminit[i]
-    adminit_df <- distinct(do.call(rbind, adminit))
-    rifs <- 0
-    adminit <- 0
-    for (j in 1:nrow(rifs_df)) {
-      sciper <- rifs_df$sciper[j]
-      rifs <- 1
-      insert_serv_pers_query <- sprintf("INSERT INTO Serveur_Personne (id_serv_pers, fqdn, sciper, rifs, adminit) VALUES (NULL, '%s', '%s', '%s', '%s')", fqdn, sciper, rifs, adminit)
-      dbExecute(con_sqlite, insert_serv_pers_query)
-    }
-    for (j in 1:nrow(adminit_df)) {
-      sciper <- adminit_df$sciper[j]
-      adminit <- 1
-      insert_serv_pers_query <- sprintf("INSERT INTO Serveur_Personne (id_serv_pers, fqdn, sciper, rifs, adminit) VALUES (NULL, '%s', '%s', '%s', '%s')", fqdn, sciper, rifs, adminit)
-      dbExecute(con_sqlite, insert_serv_pers_query)
-    }
+serveur_personne_clean <- serveur_personne %>% distinct()
+for (d in 1:nrow(serveur_personne_clean)) {
+  fqdn <- serveur_personne_clean$fqdn[d]
+  sciper <- serveur_personne_clean$sciper[d]
+  rifs <- serveur_personne_clean$rifs_flag[d]
+  adminit <- serveur_personne_clean$adminit_flag[d]
+  insert_serv_pers_query <- sprintf("INSERT INTO Serveur_Personne (id_serv_pers, fqdn, sciper, rifs_flag, adminit_flag) VALUES (NULL, '%s', '%s','%s', '%s')", fqdn, sciper, rifs, adminit)
+  dbExecute(con_sqlite, insert_serv_pers_query)
 }
 
 # close connection with sqlite
