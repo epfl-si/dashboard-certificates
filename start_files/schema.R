@@ -1,14 +1,14 @@
-# package install
-packages <- c("RSQLite", "DBI")
+# packages activation
+library(here)
 
-for (p in packages) {
-  if (!require(p, character.only = TRUE)) {
-    install.packages(p)
-    library(p, character.only = TRUE)
-  }
-}
+here::i_am("lib.R")
 
-con <- dbConnect(RSQLite::SQLite(), "./cmdb.sqlite")
+source(here("lib.R"))
+source(here("env.R"))
+
+library(RSQLite)
+
+con <- dbConnect(SQLite(), db_path)
 
 create_table_serveur <- "
 CREATE TABLE Serveur (

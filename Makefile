@@ -13,9 +13,11 @@ reformat_ssl_json:
 	rm ./prod_to_dev/temp_ssl.json
 	mv ./prod_to_dev/formated_ssl.json ./prod_to_dev/ssl.json
 
+# FIXME : toujours necessaire ?
 setup:
 	@mkdir -p volumes/elastic/data volumes/elastic/logs volumes/shiny volumes/sqlite
-	
+
+# FIXME : toujours necessaire ?
 vm-max_map_count:
 	@if [ "$$(uname)" = "Linux" ]; then \
 		sudo sysctl -w vm.max_map_count=262144 1>/dev/null && echo "vm.max_map_count changed"; \
@@ -47,6 +49,7 @@ init: setup vm-max_map_count
 	docker compose up -d
 	touch .env_started
 
+# FIXME : a ameliorer...
 elasticsearch_healthy:
 	watch -n 0.5 curl -u ${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD} -X  GET "localhost:9200/_cluster/health?pretty"
 
@@ -65,23 +68,26 @@ data: .env_started
 	--output=http://${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD}@localhost:9200/ssl \
 	--type=data
 	@curl -XPUT "http://localhost:9200/_settings" -k -u ${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD} -H "Content-Type: application/json" -d '{"index.max_result_window": 1000000}'
-	cp ./start_files/cmdb_schema.sqlite ./volumes/sqlite/cmdb.sqlite
-	cp ./start_files/add_cmdb_data.R ./volumes/sqlite/add_cmdb_data.R
-	docker exec -d ss Rscript "/home/sqlite/add_cmdb_data.R"
-	cp ./start_files/wip_start_dashboard.R ./volumes/shiny/dashboard.R
-	docker exec -d ss Rscript "/home/sqlite/dashboard.R"
+	$(MAKE) data_from_elasticsearch_to_sqlite
 	touch .data_loaded
+
+# FIXME : installer package ici ?
+data_from_elasticsearch_to_sqlite:
+	R -e "install.packages(\"here\")"
+	docker compose exec cert_dashboard Rscript "/srv/cert_dashboard/R/start_files/add_cmdb_data.R"
 
 .data_loaded:
 	$(MAKE) data
 
 up: .data_loaded vm-max_map_count
 	@docker compose up -d
+	docker compose exec -d cert_dashboard Rscript "/srv/cert_dashboard/R/start_files/dashboard.R"
 	$(MAKE) logs
 
 logs:
 	docker compose logs -f 
 
+# FIXME : .env ko si plusieurs make up a la suite...
 clean:
 	docker compose stop
 	sed -i '/ELASTICSEARCH_TOKEN/d' .env

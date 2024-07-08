@@ -17,7 +17,7 @@ Création d'un dashboard pour visualiser ses propres certificats ayant une éch�
 5) Renommer le fichier *.env.exemple* en *.env* et remplacer *<...>* par un mot de passe pour elasticsearch.
 6) FIXME : Problème de charge (mémoire, CPU, ...) sur certains ordis et utiliser `make elasticsearch_healthy` pour s'assurer que l'état du cluster n'est pas *red* sinon KO. -> Démarrer les containers (elasticsearch, kibana et shiny + sqlite) avec `make init`.
 7) Alimenter les bases de données (elasticsearch et sqlite) avec `make data`.
-8) TODO
+8) TODO (package "here" de R à installer -> FIXME : dans Makefile (actuel) ou dans README.md)
 
 ## TODO / FIXME
 
