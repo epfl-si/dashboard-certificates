@@ -31,7 +31,7 @@ secure:
 	curl -X POST -u ${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD} "localhost:9200/_security/service/elastic/kibana/credential/token/token1?pretty" | jq '.token'.'value' >> .env
 
 init: setup vm-max_map_count
-	docker run -d \
+	docker run --rm -d \
 	--name elasticsearch \
 	-p 9200:9200 \
 	-v ${pwd}/volumes/elastic/data:/usr/share/elasticsearch/data \
