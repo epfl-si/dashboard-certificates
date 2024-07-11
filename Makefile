@@ -1,3 +1,5 @@
+# FIXME : verifier que fichier avec variables d'env respecte les regles pour Makefile car sourcé par lui
+
 SHELL := /bin/bash
 
 ENV_FILE = .env

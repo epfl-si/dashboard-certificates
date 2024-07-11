@@ -20,9 +20,7 @@ Création d'un dashboard pour visualiser ses propres certificats ayant une éch�
 
 ## TODO / FIXME
 
-- add_cmdb_data.R (voir FIXMEs) -> correspondance entre données de ssl et cmdb KO + ajout colonnes rifs_flag et adminit_flag dans Serveur_Personne KO
-- fixer impossibilité de lancer scripts R via commande dans Makefile
-- utiliser .env pour ne pas devoir modifier manuellement configurations si scripts lancés dans container ou en local
+- add_cmdb_data.R (voir FIXMEs) -> correspondance entre données de ssl et cmdb KO
+- fixer lancements des scripts R depuis Makefile (dans et hors docker)
 - dashboard -> finir tableau (pour l'instant ébauche de tableau avec toutes les données), créer page de détails et créer vues différentes en fonction du sciper / fonction du user
-- créer un script à part pour packages de R
 - Makefile -> ne doit pas poser problème si même commande relancée plusieurs fois de suite (KO avec génération du token pour `make secure`)
