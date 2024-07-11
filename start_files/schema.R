@@ -1,14 +1,14 @@
-# package install
-packages <- c("RSQLite", "DBI")
+# packages activation
+library(here)
 
-for (p in packages) {
-  if (!require(p, character.only = TRUE)) {
-    install.packages(p)
-    library(p, character.only = TRUE)
-  }
-}
+here::i_am("lib.R")
 
-con <- dbConnect(RSQLite::SQLite(), "./cmdb.sqlite")
+source(here("lib.R"))
+source(here("env.R"))
+
+library(RSQLite)
+
+con <- dbConnect(SQLite(), db_path)
 
 create_table_serveur <- "
 CREATE TABLE Serveur (
@@ -34,8 +34,8 @@ CREATE TABLE Serveur_Personne (
 	id_serv_pers INTEGER PRIMARY KEY AUTOINCREMENT,
 	fqdn TEXT NOT NULL,
 	sciper INTEGER NOT NULL,
-	rifs INTEGER NOT NULL,
-	adminit INTEGER NOT NULL,
+	rifs_flag INTEGER NOT NULL,
+	adminit_flag INTEGER NOT NULL,
 	CONSTRAINT Serveur_Serveur_Personne_FK FOREIGN KEY (fqdn) REFERENCES Serveur(fqdn) ON DELETE SET NULL ON UPDATE CASCADE,
 	CONSTRAINT Personne_Serveur_Personne_FK FOREIGN KEY (sciper) REFERENCES Serveur(sciper) ON DELETE SET NULL ON UPDATE CASCADE
 );"

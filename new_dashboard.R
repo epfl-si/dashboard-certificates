@@ -4,6 +4,7 @@ source(here("lib.R"))
 source(here("env.R"))
 
 library(shiny)
+library(shinydashboard)
 library(DT)
 library(elastic)
 library(RSQLite)
@@ -35,55 +36,69 @@ tableau <- ssl_data %>% select(hostname, ipv4, validFrom, validTo) %>% mutate(va
 adminit <- ssl_data %>% select(hostname) %>% left_join(cmdb_data_serveur_personne %>% dplyr::filter(adminit_flag == 1) %>% select(fqdn, sciper), by = c("hostname" = "fqdn"))
 prenom_nom_adminit <- cmdb_data_personne %>% select(sciper, cn) %>% right_join(adminit, by = "sciper") %>% select(sciper, cn, hostname)
 colonnes_exclues <- c("@timestamp", "ipv4", "validFrom", "validTo")
-tableau_details <- ssl_data %>% left_join(prenom_nom_adminit %>% select(hostname, cn), by = "hostname") %>% mutate(adminit = cn) %>% group_by(hostname) %>% summarise(adminit = list(adminit)) %>% ungroup() %>% select(hostname, adminit, -any_of(colonnes_exclues))
+tableau_details <- ssl_data %>% left_join(prenom_nom_adminit %>% select(hostname, cn), by = "hostname") %>% mutate(adminit = cn)
+group_cols <- setdiff(names(tableau_details), colonnes_exclues)
+tableau_details <- tableau_details %>% group_by(across(all_of(group_cols))) %>% summarise(adminit = list(adminit), .groups = 'drop') %>% select(hostname, adminit, everything(), -any_of(colonnes_exclues))
 # FIXME : besoin des donnees de ces sous-tableaux pour afficher en detail ?
 subject <- ssl_data$subject
 issuer <- ssl_data$issuer
 proto <- ssl_data$proto
 
-ui <- fluidPage(
-  titlePanel("Certificats SSL"),
-  DTOutput("table"),
-  DTOutput("details")
+# TODO : notifier quand echeance proche
+text_notification <- "TODO"
+
+ui <- dashboardPage(skin = "red",
+  dashboardHeader(title = "Certificats SSL", dropdownMenuOutput("notifOutput")),
+  dashboardSidebar(
+    sidebarMenu(
+      menuItem("Listing", tabName = "listing", icon = icon("list")),
+      menuItem("Détails", tabName = "details", icon = icon("info-circle")),
+      menuItem("Vue d'ensemble", tabName = "plots", icon = icon("chart-bar")),
+      conditionalPanel(
+                  condition = 'input.sidebar == "details"',
+                  # FIXME : pas de champ de recherche pour filtrer sur hostname
+                  selectInput("hostname", "Choix de l'hostname pour obtenir les détails:", choices = tableau$hostname, selected = tableau$hostname[1])
+                )
+    )
+  ),
+  dashboardBody(
+    tabItems(
+      tabItem(tabName = "listing",
+              fluidPage(
+                DTOutput("df_all")
+              )),
+      tabItem(tabName = "details",
+              # FIXME: ajouter un champ de recherche pour filtrer sur hostname
+              # FIXME: afficher tableau avec details
+              fluidPage(
+                DTOutput("df_details")
+              )),
+      tabItem(tabName = "plots"
+      # TODO : afficher nombre de certificats avec echeance dans semaine, mois, annee, ... selon histogramme
+      )
+    )
+  )
 )
 
 server <- function(input, output) {
-  output$table <- renderDT({
-    datatable(tableau, selection = 'single')
+  output$notifOutput <- renderMenu({
+    notif <- notificationItem(text_notification, icon = icon("warning"))
+    dropdownMenu(type = "notifications", notif)
   })
 
-  output$details <- renderDT({
-    req(input$table_rows_selected)
-    selected_row <- input$table_rows_selected
-    details <- tableau_details[selected_row, ]
-    datatable(details)
+  output$df_all <- renderDT({
+    datatable(tableau)
+  })
+
+  # FIXME
+  output$df_details <- renderDT({
+    datatable(tableau_details %>% dplyr::filter(hostname == input$hostname))
   })
 }
 
-shinyApp(ui = ui, server = server)
+shinyApp(ui, server)
 
-
-# code pour sciper specifique
-
-# # FIXME : authentification avec tequila renvoie un unique sciper
-# scipers <- cmdb_data_personne
-# user_sciper <- ...
-# 
-# # aller dans table serveur_personne pour prendre tous les ips en fonction du sciper
-# user_ips <- cmdb_data_serveur_personne %>% filter(sciper == user_sciper) %>% pull(ip_adr) %>% unique()
-# # recuperer infos de data_ssl pour certificats -> tout sauf timestamp, subject, issuer et proto
-# ssl_infos <- ssl_data %>% filter(ipv4 %in% user_ips) %>% select(-c("@timestamp", "subject", "issuer", "proto")) %>% distinct()
-# # recuperer infos de cmdb_data_serveur pour fqdn
-# user_fqdns <- cmdb_data_serveur %>% filter(ip %in% user_ips) %>% select(ip, fqdn) %>% distinct()
-# # recuperer infos de cmdb_data_personne pour autres responsables -> sciper, cn et email
-# autres_resp_sciper <- cmdb_data_serveur_personne %>% filter(ip_adr %in% user_ips) %>% pull(sciper) %>% unique()
-# autres_resp_infos <- cmdb_data_personne %>% filter(sciper %in% autres_resp_sciper) %>% select(sciper, cn, email) %>% distinct()
-# # mettre en forme table avec colonnes dans bon ordre
-# table_1 <- ssl_infos %>% select(validFrom, validTo, ipv4) %>% distinct()
-# table_2 <- user_fqdns %>% distinct()
-# table_3 <- autres_resp_infos %>% distinct()
-# table_4 <- ssl_infos %>% select(-c(ipv4, validFrom, validTo)) %>% distinct()
-# merged_table <- merge(table_1, table_2, by.x = "ipv4", by.y = "ip", all.x = TRUE)
-# merged_table <- merge(merged_table, table_4, by = "ipv4", all.x = TRUE)
-# merged_table <- merge(merged_table, table_3, by = "sciper", all.x = TRUE)
-# # supprimer details et n'afficher que essentiel
+#header <- dashboardHeader()
+#sidebar <- dashboardSidebar()
+#body <- dashboardBody()
+#dashboardPage(header, sidebar, body)

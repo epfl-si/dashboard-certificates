@@ -1,7 +1,7 @@
 # directory containing volume for elasticsearch, shiny and sqlite
-volumes/
+volumes/*
 # directory containing internal data
-prod_to_dev/internal_data/
+prod_to_dev/internal_data/*
 # file containing credentials
 .env
 # file for Makefile

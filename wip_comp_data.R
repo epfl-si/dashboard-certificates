@@ -1,17 +1,20 @@
-# package install
-packages <- c("elastic", "RSQLite", "jsonlite", "dplyr")
+# packages activation
+library(here)
 
-for (p in packages) {
-  if (!require(p, character.only = TRUE)) {
-    install.packages(p)
-    library(p, character.only = TRUE)
-  }
-}
+here::i_am("lib.R")
+
+source(here("lib.R"))
+source(here("env.R"))
+
+library(dplyr)
+library(elastic)
+library(jsonlite)
+library(RSQLite)
 
 # open connection with elasticsearch
-con_elasticsearch <- connect(host = "localhost", path = "", user="", pwd = "", port = 9200, transport_schema  = "http")
+con_elasticsearch <- connect(host = host_elasticsearch, user = user_elasticsearch, pwd = password_elasticsearch, port = port_elasticsearch, transport_schema  = "http")
 # open connection with sqlite
-con_sqlite <- dbConnect(RSQLite::SQLite(), "./volumes//sqlite/cmdb.sqlite")
+con_sqlite <- dbConnect(RSQLite::SQLite(), db_path)
 
 # import data from cmdb index
 cmdb_data <- fromJSON(Search(con_elasticsearch, index = "cmdb", size = 100000, raw = TRUE))$hits$hits$"_source"

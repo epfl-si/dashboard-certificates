@@ -11,13 +11,12 @@ Création d'un dashboard pour visualiser ses propres certificats ayant une éch�
 ## Marche à suivre
 
 1) Cloner le repo.
-2) Créer le dossier *internal_data* sous *./prod_to_dev* (dossier déjà présent dans repo).
-3) Placer les fichiers JSON contenant les données de production à importer dans le dossier *prod_to_dev/internal_data* (cmdb.json et ssl.json).
-4) FIXME : Toujours nécessaire ou non ? -> Formater le fichier ssl.json avec `make reformat_ssl_json`.
-5) Renommer le fichier *.env.exemple* en *.env* et remplacer *<...>* par un mot de passe pour elasticsearch.
-6) FIXME : Problème de charge (mémoire, CPU, ...) sur certains ordis et utiliser `make elasticsearch_healthy` pour s'assurer que l'état du cluster n'est pas *red* sinon KO. -> Démarrer les containers (elasticsearch, kibana et shiny + sqlite) avec `make init`.
-7) Alimenter les bases de données (elasticsearch et sqlite) avec `make data`.
-8) TODO
+2) Placer les fichiers JSON contenant les données de production à importer dans le dossier *prod_to_dev/internal_data* (cmdb.json et ssl.json). -> FIXME : importer nous-mêmes depuis la prod plutôt que par échange d'emails ?
+3) FIXME : Toujours nécessaire ou non ? -> Formater le fichier ssl.json avec `make reformat_ssl_json`.
+4) Renommer le fichier *.env.exemple* en *.env* et remplacer *<...>* par un mot de passe pour elasticsearch.
+5) FIXME : Problème de charge (mémoire, CPU, ...) sur certains ordis et utiliser `make elasticsearch_healthy` pour s'assurer que l'état du cluster n'est pas *red* sinon KO. -> Démarrer les containers (elasticsearch, kibana et shiny + sqlite) avec `make init`.
+6) Alimenter les bases de données (elasticsearch et sqlite) avec `make data`.
+7) TODO (package "here" de R à installer -> FIXME : dans Makefile (actuel) ou dans README.md)
 
 ## TODO / FIXME
 

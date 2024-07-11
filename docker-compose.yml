@@ -1,9 +1,9 @@
 services:
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.13.2
-    container_name: es
+    container_name: elasticsearch
     ports:
-      - "9200:9200"
+      - "127.0.0.1:9200:9200"
     volumes:
       - ./volumes/elastic/data:/usr/share/elasticsearch/data
       - ./volumes/elastic/logs:/usr/share/elasticsearch/logs
@@ -16,22 +16,25 @@ services:
 
   kibana:
     image: docker.elastic.co/kibana/kibana:8.13.2
-    container_name: kb
+    container_name: kibana
     ports:
-      - "5601:5601"
+      - "127.0.0.1:5601:5601"
     environment:
       - ELASTICSEARCH_URL=http://localhost:9200
       - ELASTICSEARCH_SERVICEACCOUNTTOKEN=${ELASTICSEARCH_TOKEN}
     depends_on:
      - elasticsearch
 
-  shiny_sqlite:
+  cert_dashboard:
     build: .
-    container_name: ss
+    container_name: cert_dashboard
     ports:
-      - "8181:8180"
+      - "127.0.0.1:8181:8180"
+    env_file:
+      - .env
     depends_on:
      - elasticsearch
     volumes:
-      - ./volumes/shiny:/home/shiny
-      - ./volumes/sqlite:/home/sqlite
+      - .:/srv/cert_dashboard/R
+      - ./volumes/sqlite:/srv/cert_dashboard/sqlite
+      - ./env-docker.R:/srv/cert_dashboard/R/env.R
