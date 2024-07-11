@@ -1,4 +1,5 @@
 services:
+  # utilise en dev et staging
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.13.2
     container_name: elasticsearch
@@ -14,6 +15,7 @@ services:
       - ELASTIC_PASSWORD=${ELASTICSEARCH_PASSWORD}
       - xpack.security.enabled=true
 
+  # utilise en dev et staging
   kibana:
     image: docker.elastic.co/kibana/kibana:8.13.2
     container_name: kibana
@@ -25,6 +27,7 @@ services:
     depends_on:
      - elasticsearch
 
+  # utilise uniquement en staging pour tester image, pas pour tester scripts R et autre
   cert_dashboard:
     build: .
     container_name: cert_dashboard
