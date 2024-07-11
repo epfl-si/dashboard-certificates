@@ -1,5 +1,7 @@
 # FIXME : verifier que fichier avec variables d'env respecte les regles pour Makefile car sourcé par lui
 
+# TODO : ajouter docker compose logs -f
+
 SHELL := /bin/bash
 
 ENV_FILE = .env
@@ -41,18 +43,16 @@ data_real: .elasticsearch_started
 # TODO : version de chargement des donnes ou import depuis elasticsearch de prod et export dans elasticsearch de dev
 
 dashboard:
-	@docker compose start-d cert_dashboard
+	docker compose up cert_dashboard
 # TODO : changer le nom du script
 	Rscript dashboard.R
-	$(MAKE) logs
 
 .elasticsearch_started:
 	$(MAKE) elasticsearch
 	@touch .elasticsearch_started
 
 elasticsearch: vm-max_map_count
-	@docker compose start-d elasticsearch
-	$(MAKE) logs
+	docker compose up elasticsearch
 # FIXME : fichier genere uniquement quand elasticsearch est dispo, pas avant
 
 # FIXME : toujours necessaire (lancement du container de elasticsearch ko sinon chez moi) ?
@@ -69,8 +69,7 @@ elasticsearch_healthy:
 	watch -n 0.5 curl -u ${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD} -X  GET "localhost:9200/_cluster/health?pretty"
 
 kibana: .elasticsearch_started .kibana_token_available
-	@docker compose start-d kibana
-	$(MAKE) logs
+	docker compose up kibana
 
 .kibana_token_available:
 	$(MAKE) token
