@@ -41,7 +41,7 @@ data_real: .elasticsearch_started
 # TODO : version de chargement des donnes ou import depuis elasticsearch de prod et export dans elasticsearch de dev
 
 dashboard:
-	@docker compose up -d cert_dashboard
+	@docker compose start-d cert_dashboard
 # TODO : changer le nom du script
 	Rscript dashboard.R
 	$(MAKE) logs
@@ -51,7 +51,7 @@ dashboard:
 	@touch .elasticsearch_started
 
 elasticsearch: vm-max_map_count
-	@docker compose up -d elasticsearch
+	@docker compose start-d elasticsearch
 	$(MAKE) logs
 # FIXME : fichier genere uniquement quand elasticsearch est dispo, pas avant
 
@@ -69,7 +69,7 @@ elasticsearch_healthy:
 	watch -n 0.5 curl -u ${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD} -X  GET "localhost:9200/_cluster/health?pretty"
 
 kibana: .elasticsearch_started .kibana_token_available
-	@docker compose up -d kibana
+	@docker compose start-d kibana
 	$(MAKE) logs
 
 .kibana_token_available:
