@@ -3,7 +3,7 @@ services:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.13.2
     container_name: elasticsearch
     ports:
-      - "9200:9200"
+      - "127.0.0.1:9200:9200"
     volumes:
       - ./volumes/elastic/data:/usr/share/elasticsearch/data
       - ./volumes/elastic/logs:/usr/share/elasticsearch/logs
@@ -18,7 +18,7 @@ services:
     image: docker.elastic.co/kibana/kibana:8.13.2
     container_name: kibana
     ports:
-      - "5601:5601"
+      - "127.0.0.1:5601:5601"
     environment:
       - ELASTICSEARCH_URL=http://localhost:9200
       - ELASTICSEARCH_SERVICEACCOUNTTOKEN=${ELASTICSEARCH_TOKEN}
@@ -29,7 +29,9 @@ services:
     build: .
     container_name: cert_dashboard
     ports:
-      - "8181:8180"
+      - "127.0.0.1:8181:8180"
+    env_file:
+      - .env
     depends_on:
      - elasticsearch
     volumes:

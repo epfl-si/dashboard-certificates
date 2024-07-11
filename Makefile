@@ -36,8 +36,8 @@ init: setup vm-max_map_count
 	docker run -d \
 	--name elasticsearch \
 	-p 9200:9200 \
-	-v ${pwd}/volumes/elastic/data:/usr/share/elasticsearch/data \
-	-v ${pwd}/volumes/elastic/logs:/usr/share/elasticsearch/logs \
+	-v ./volumes/elastic/data:/usr/share/elasticsearch/data \
+	-v ./volumes/elastic/logs:/usr/share/elasticsearch/logs \
 	-e "discovery.type=single-node" \
 	-e "cluster.name=cluster_name" \
 	-e "network.host=0.0.0.0" \

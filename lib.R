@@ -1,5 +1,5 @@
 # packages install
-packages <- c("DBI", "dotenv", "dplyr", "elastic", "here", "httr", "jsonlite", "RSQLite")
+packages <- c("DBI", "dotenv", "dplyr", "DT", "elastic", "here", "httr", "jsonlite", "roperators", "RSQLite", "shiny", "shinydashboard")
 
 for (p in packages) {
   if (!require(p, character.only = TRUE)) {
