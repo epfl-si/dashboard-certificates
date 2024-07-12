@@ -1,7 +1,5 @@
 # FIXME : verifier que fichier avec variables d'env respecte les regles pour Makefile car sourcé par lui
 
-# TODO : ajouter docker compose logs -f
-
 SHELL := /bin/bash
 
 ENV_FILE = .env
@@ -34,14 +32,27 @@ data_copy: .elasticsearch_started
 	@curl -XPUT "http://localhost:9200/_settings" -k -u ${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD} -H "Content-Type: application/json" -d '{"index.max_result_window": 1000000}'
 	$(MAKE) nosql_into_sql
 
+# TODO : version pour les deux methodes selon var d'env a tester
+data: .elasticsearch_started
+# FIXME : mapping necessaire ou non pour cmdb ?
+	@echo "Mapping of cmdb index" && curl -XPUT "http://localhost:9200/cmdb" -k -u ${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD} -H "Content-Type: application/json" -d @./prod_to_dev/mapping_cmdb.json
+	@echo "\nPull elasticdump image" && docker pull elasticdump/elasticsearch-dump
+	@echo "Load cmdb index in elasticsearch" && docker run --net=host --rm -ti -v ./prod_to_dev/internal_data:/tmp elasticdump/elasticsearch-dump \
+	--input=${SOURCE_CMDB} \
+	--output=http://${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD}@localhost:9200/cmdb \
+	--type=data
+	@echo "Load ssl index in elasticsearch" && docker run --net=host --rm -ti -v ./prod_to_dev/internal_data:/tmp elasticdump/elasticsearch-dump \
+	--input=${SOURCE_SSL} \
+	--output=http://${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD}@localhost:9200/ssl \
+	--type=data
+	@curl -XPUT "http://localhost:9200/_settings" -k -u ${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD} -H "Content-Type: application/json" -d '{"index.max_result_window": 1000000}'
+	$(MAKE) nosql_into_sql
+
 nosql_into_sql:
 	cp cmdb_schema.sqlite ./volumes/sqlite/cmdb.sqlite
 	@ echo "Install 'here' R package" && R -e "install.packages(\"here\")"
 # FIXME : comment voir l'execution du script ?
 	@ echo "Load data from elasticsearch into sqlite" && Rscript add_cmdb_data.R
-
-data_real: .elasticsearch_started
-# TODO : version de chargement des donnes ou import depuis elasticsearch de prod et export dans elasticsearch de dev
 
 dashboard:
 	docker compose up -d cert_dashboard
@@ -79,7 +90,6 @@ kibana: .elasticsearch_started .kibana_token_available
 	$(MAKE) token
 	@touch .kibana_token_available
 
-# TODO : gerer authentification entre elasticsearch et kibana selon dev ou prod et timing pour generer token
 token:
 	echo "Waiting for elasticsearch to be ready"; \
 	while [ "$$(curl -s -o /dev/null -w '%{http_code}' -u ${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD} -XGET "localhost:9200/_security/_authenticate")" != "200" ]; do \
@@ -94,7 +104,7 @@ clean:
 	docker compose stop
 	sed -i '/ELASTICSEARCH_TOKEN/d' .env
 	rm -rf ./volumes
-# TODO : supprimer les fichiers .'...' genere par le Makefile
+	rm -f .env_started .elasticsearch_started .kibana_token_available
 
 # FIXME : toujours necessaire ?
 reformat_ssl_json:
