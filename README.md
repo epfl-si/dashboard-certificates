@@ -6,7 +6,7 @@ Création d'un dashboard pour visualiser ses propres certificats ayant une éch�
 
 - Docker
 - R
-- DBeaver
+- SQLite3
 
 ## Marche à suivre
 

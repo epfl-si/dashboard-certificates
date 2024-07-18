@@ -56,7 +56,7 @@ nosql_into_sql:
 
 dashboard:
 	docker compose up -d cert_dashboard
-	docker compose logs -f cert_dashboard
+#docker compose logs -f cert_dashboard
 # FIXME : but est de lancer script dans Makefile ou dans docker avec docker compose ?
 
 .elasticsearch_started:
@@ -71,7 +71,7 @@ dashboard:
 
 elasticsearch: vm-max_map_count
 	@docker compose up -d elasticsearch
-	docker compose logs -f elasticsearch
+#docker compose logs -f elasticsearch
 # FIXME : fichier genere uniquement quand elasticsearch est dispo, pas avant
 
 # FIXME : toujours necessaire (lancement du container de elasticsearch ko sinon chez moi) ?
@@ -89,7 +89,7 @@ elasticsearch_healthy:
 
 kibana: .elasticsearch_started .kibana_token_available
 	docker compose up -d kibana
-	docker compose logs -f kibana
+#docker compose logs -f kibana
 
 .kibana_token_available:
 	$(MAKE) token
