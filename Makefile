@@ -62,6 +62,11 @@ dashboard:
 .elasticsearch_started:
 	$(MAKE) elasticsearch
 # FIXME : generation du fichier que quand elasticsearch ready (boucle tant que pas fichier ?)
+	echo "Waiting for elasticsearch to be ready"; \
+	while [ "$$(curl -s -o /dev/null -w '%{http_code}' -u ${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD} -XGET "localhost:9200/")" != "200" ]; do \
+	sleep 5; \
+	echo "."; \
+	done
 	@touch .elasticsearch_started
 
 elasticsearch: vm-max_map_count
@@ -96,7 +101,7 @@ token:
 	sleep 5; \
 	echo "..."; \
 	done
-	echo -e "ELASTICSEARCH_TOKEN = \c" >> .env && \
+	echo -e -n "ELASTICSEARCH_TOKEN=" >> .env && \
 	curl -X POST -u ${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD} "localhost:9200/_security/service/elastic/kibana/credential/token/token1?pretty" | jq '.token'.'value' >> .env
 
 # FIXME : .env ko si generation du token plusieurs fois...
