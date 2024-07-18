@@ -13,7 +13,7 @@ Création d'un dashboard pour visualiser ses propres certificats ayant une éch�
 1) Cloner le repo.
 2) Placer les fichiers JSON contenant les données de production à importer dans le dossier *prod_to_dev/internal_data* (cmdb.json et ssl.json). -> TODO : version quand import direct depuis la prod
 3) FIXME : Toujours nécessaire ou non ? -> Formater le fichier ssl.json avec `make reformat_ssl_json`.
-4) Renommer le fichier *.env_default* en *.env* -> TODO : version qui pointe sur elasticsearch de prod (*.env_advanced*)
+4) Copier le fichier *.env_default* et le renommer en *.env* -> TODO : version qui pointe sur elasticsearch de prod (*.env_advanced*)
 5) FIXME : Problème de charge (mémoire, CPU, ...) sur certains ordis et utiliser `make elasticsearch_healthy` pour s'assurer que l'état du cluster n'est pas *red* sinon KO.
 6) `make up` pour version standard et sinon TODO
 
