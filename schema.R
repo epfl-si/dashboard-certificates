@@ -10,6 +10,8 @@ library(RSQLite)
 
 con <- dbConnect(SQLite(), db_path)
 
+# TODO : cle primaire doit etre ip et fqdn, pas l'un ou l'autre !
+
 create_table_serveur <- "
 CREATE TABLE Serveur (
 	id_ip_adr INTEGER PRIMARY KEY AUTOINCREMENT,
