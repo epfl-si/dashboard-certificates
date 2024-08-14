@@ -7,4 +7,6 @@ prod_to_dev/internal_data/*
 # file for Makefile
 .env_started
 # file for Makefile
-.data_loaded
+.elasticsearch_started
+# file for Makefile
+.kibana_token_available

@@ -65,36 +65,38 @@ for (i in 1:nrow(mix_rifs_adminit)) {
 
 # Server_User table
 ips_key <- dbGetQuery(con_sqlite, "SELECT * FROM Server") %>% select(id_ip, ip)
-server_user <- data.frame(id_ip = numeric(), sciper = numeric(), rifs_flag = numeric(), adminit_flag = numeric(), stringsAsFactors = FALSE)
+users_key <- dbGetQuery(con_sqlite, "SELECT * FROM User") %>% select(id_user, sciper)
+server_user <- data.frame(id_ip = numeric(), id_user = numeric(), rifs_flag = numeric(), adminit_flag = numeric(), stringsAsFactors = FALSE)
 for(i in 1:nrow(cmdb_data_filtred)) {
-  id <- which(ips_key$ip == cmdb_data_filtred$ip[i])
+  id_ser <- ips_key %>% filter(ip == cmdb_data_filtred$ip[i]) %>% select(id_ip)
   rifs <- data.frame(cmdb_data_filtred$unit$rifs[[i]], stringsAsFactors = FALSE)
   if (nrow(rifs) > 0) {
     for (j in 1:nrow(rifs)) {
-      new_row <- data.frame(id_ip = id, sciper = rifs$sciper[j], rifs_flag = 1, adminit_flag = 0, stringsAsFactors = FALSE)
+      id_us <- users_key %>% filter(sciper == rifs$sciper[j]) %>% select(id_user)
+      new_row <- data.frame(id_ip = id_ser, id_user = id_us, rifs_flag = 1, adminit_flag = 0, stringsAsFactors = FALSE)
       server_user <- rbind(server_user, new_row)
     }
   }
   adminit <- data.frame(cmdb_data_filtred$unit$adminit[[i]], stringsAsFactors = FALSE)
   if (nrow(adminit) > 0) {
     for (k in 1:nrow(adminit)) {
-      if (adminit$sciper[k] %in% server_user$sciper) {
-        server_user[server_user$sciper == adminit$sciper[k], "adminit_flag"] <- 1
+      id_us <- users_key %>% filter(sciper == adminit$sciper[k]) %>% select(id_user)
+      if (id_us %in% server_user$id_user) {
+        server_user[server_user$id_user == id_us, "adminit_flag"] <- 1
       } else {
-        new_row <- data.frame(id_ip = id, sciper = adminit$sciper[k], rifs_flag = 0, adminit_flag = 1, stringsAsFactors = FALSE)
+        new_row <- data.frame(id_ip = id_ser, id_user = id_us, rifs_flag = 0, adminit_flag = 1, stringsAsFactors = FALSE)
         server_user <- rbind(server_user, new_row)
       }
     }
   }
 }
 
-server_user_clean <- server_user %>% distinct()
-for (d in 1:nrow(server_user_clean)) {
-  id_ip <- server_user_clean$id_ip[d]
-  sciper <- server_user_clean$sciper[d]
-  rifs <- server_user_clean$rifs_flag[d]
-  adminit <- server_user_clean$adminit_flag[d]
-  insert_query <- sprintf("INSERT INTO Server_User (id_server_user, id_ip, sciper, rifs_flag, adminit_flag) VALUES (NULL, '%d', '%d','%d', '%d')", id_ip, sciper, rifs, adminit)
+for (d in 1:nrow(server_user)) {
+  id_ip <- server_user$id_ip[d]
+  id_user <- server_user$id_user[d]
+  rifs <- server_user$rifs_flag[d]
+  adminit <- server_user$adminit_flag[d]
+  insert_query <- sprintf("INSERT INTO Server_User (id_server_user, id_ip, id_user, rifs_flag, adminit_flag) VALUES (NULL, '%d', '%d','%d', '%d')", id_ip, id_user, rifs, adminit)
   dbExecute(con_sqlite, insert_query)
 }
 

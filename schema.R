@@ -27,13 +27,13 @@ create_table_server_user <- "
 CREATE TABLE Server_User (
 	id_server_user INTEGER PRIMARY KEY AUTOINCREMENT,
 	id_ip INTEGER NOT NULL,
-	sciper INTEGER NOT NULL,
-	rifs_flag INTEGER NOT NULL,
-	adminit_flag INTEGER NOT NULL,
+	id_user INTEGER,
+	rifs_flag INTEGER,
+	adminit_flag INTEGER,
 	CONSTRAINT Server_Server_User_FK FOREIGN KEY (id_ip) REFERENCES Server(id_ip) ON DELETE SET NULL ON UPDATE CASCADE,
-	CONSTRAINT User_Server_User_FK FOREIGN KEY (sciper) REFERENCES Server(sciper) ON DELETE SET NULL ON UPDATE CASCADE
+	CONSTRAINT User_Server_User_FK FOREIGN KEY (id_user) REFERENCES Server(id_user) ON DELETE SET NULL ON UPDATE CASCADE
 );"
 
 dbExecute(con, create_table_server_user)
 
-dbDisconnect(con_sqlite)
+dbDisconnect(con)
