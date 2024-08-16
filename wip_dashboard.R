@@ -57,8 +57,7 @@ sidebar <- dashboardSidebar(
     menuItem("Vue globale", tabName = "listing", icon = icon("list")),
     # TODO : date de debut et de fin pour periode d'echeance et affichage du label
     convertMenuItem(menuItem("Echéances", tabName = "date_filter", icon = icon("circle-exclamation"), DatePicker.shinyInput("date_fin_max", label = "Choisir la date d'échéance maximale :", value = NULL)), tabName = "date_filter"),
-    # TODO : filtre aussi selon hostname
-    convertMenuItem(menuItem("Responsables", tabName = "user_filter", icon = icon("info-circle"), numericInput("sciper", "Choisir le sciper d'un responsable :", value = NULL)), tabName = "user_filter")
+    convertMenuItem(menuItem("Responsables", tabName = "user_filter", icon = icon("info-circle"), numericInput("sciper", "Choisir le sciper d'un responsable :", value = NULL), textInput("hostname", "Choisir le hostname d'un certificat :", value = "")), tabName = "user_filter")
   )
 )
 
@@ -112,13 +111,20 @@ server <- function(input, output) {
 
   output$df_user <- renderDT({
     sciper <- input$sciper
+    hn <- input$hostname
     # TODO : trouver un autre type pour sciper car si numeric alors nombre negatif autorise + fleches pour faire +/- 2, 3, ... mais pas de lettres sauf e
-    if (is.na(sciper)) {
+    if (is.na(sciper) && hn == "") {
       info_cert <- tableau
-    } else {
+    } else if (!is.na(sciper) && hn == "") {
       ips <- dbGetQuery(con_sqlite, sprintf("SELECT User.id_user, User.sciper, Server.id_ip, Server.ip FROM User LEFT JOIN Server_User ON User.id_user = Server_User.id_user LEFT JOIN Server ON Server_User.id_ip = Server.id_ip WHERE sciper = %s;", sciper))
       info_cert <- tableau %>% filter(ip %in% ips$ip)
+     } else if (is.na(sciper) && hn != "") {
+      info_cert <- tableau %>% filter(hostname == hn)
+     } else {
+      ips <- dbGetQuery(con_sqlite, sprintf("SELECT User.id_user, User.sciper, Server.id_ip, Server.ip FROM User LEFT JOIN Server_User ON User.id_user = Server_User.id_user LEFT JOIN Server ON Server_User.id_ip = Server.id_ip WHERE sciper = %s;", sciper))
+      info_cert <- tableau %>% filter(ip %in% ips$ip) %>% filter(hostname == hn)
      }
+     # TODO : simplifier ci-dessus
     datatable(info_cert, selection = 'single', options = list(searching = FALSE), class = 'stripe hover')
   })
 
