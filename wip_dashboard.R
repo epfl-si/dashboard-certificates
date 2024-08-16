@@ -1,6 +1,6 @@
-# TODO : ajouter details des certificats sur premier onglet, filtre aussi par hostname sur dernier onglet, date d'echeance comprise dans periode pour deuxieme onglet et chnager type d'input pour troisieme onglet
-# DONE : avec un sciper, trouver les certificats associes avec autres personnes responsables
-# MAYBE : info cert + resp sur vue globale ou en ouvrant nouvel onglet
+# TODO : changer type d'input pour troisieme onglet
+# TODO : ajouter onglet avec diagramme pour visualiser combien de certificats avec echeance dans 1 semaine, 1 mois, 1 annee, ...
+# MAYBE : info cert + resp sur meme onglet ou en ouvrant nouvel onglet quand clic sur ligne (https://stackoverflow.com/questions/45151436/shiny-datatable-popup-data-about-selected-row-in-a-new-window)
 
 library(here)
 here::i_am("lib.R")
@@ -27,18 +27,24 @@ con_elasticsearch <- connect(host = host_elasticsearch, user = user_elasticsearc
 con_sqlite <- dbConnect(RSQLite::SQLite(), db_path)
 
 # import ssl data from elasticsearch
-ssl_data <- fromJSON(Search(con_elasticsearch, index = "ssl", size = 10000, raw = TRUE))$hits$hits$"_source" %>% mutate(ipv4 = as.character(ipv4)) %>% mutate(validFrom = as.Date(validFrom), validTo = as.Date(validTo))
+ssl_data <- fromJSON(Search(con_elasticsearch, index = "ssl", size = 10000, raw = TRUE))$hits$hits$"_source" %>% mutate(ipv4 = as.character(ipv4)) %>% mutate(validFrom = as.Date(validFrom), validTo = as.Date(validTo)) %>% rename(ip = ipv4, date_debut = validFrom, date_fin = validTo)
 
-# tableau global avec hostname, ip, date_debut, date_fin
+# tableau avec hostname, ip, date_debut, date_fin
 # FIXME : comment trier les donnees a la base (pour l'instant sur hostname partout) ?
-tableau <- ssl_data %>% select(hostname, ipv4, validFrom, validTo) %>% rename(ip = ipv4, date_debut = validFrom, date_fin = validTo) %>% arrange(hostname)
+table <- ssl_data %>% select(hostname, ip, date_debut, date_fin) %>% arrange(hostname)
 
-# FIXME : trouver un moyen pour afficher les dates autrement mais garder le tri dynamique possible
-
+# tableau avec tout de ssl
+# TODO : formater les donnees de ssl et de cmdb pour donner la possibilite d'afficher toutes les colonnes utiles dans premier onglet
+table_all <- ssl_data
 # FIXME : besoin des donnees de ces sous-tableaux pour afficher les details ?
 subject <- ssl_data$subject
 issuer <- ssl_data$issuer
 proto <- ssl_data$proto
+# noms des colonnes
+column_default <- c("hostname", "ip", "date_debut", "date_fin")
+column_choices <- names(table_all)
+
+# FIXME : trouver un moyen pour afficher les dates autrement mais garder le tri dynamique possible
 
 # TODO : notifier quand echeance proche
 text_notification <- "TODO"
@@ -54,9 +60,8 @@ header <- dashboardHeader(title = "Certificats SSL", dropdownMenuOutput("notifOu
 
 sidebar <- dashboardSidebar(
   sidebarMenu(
-    menuItem("Vue globale", tabName = "listing", icon = icon("list")),
-    # TODO : date de debut et de fin pour periode d'echeance et affichage du label
-    convertMenuItem(menuItem("Echéances", tabName = "date_filter", icon = icon("circle-exclamation"), DatePicker.shinyInput("date_fin_max", label = "Choisir la date d'échéance maximale :", value = NULL)), tabName = "date_filter"),
+    convertMenuItem(menuItem("Vue globale", tabName = "listing", icon = icon("list"), checkboxGroupInput("columns", "Choisissez les colonnes à afficher :", choices = column_choices, selected = column_default)), tabName = "listing"),
+    convertMenuItem(menuItem("Echéances", tabName = "date_filter", icon = icon("circle-exclamation"), dateRangeInput("date_fin_plage", label = "Choisir la période comprenant la date d'échéance :", start = Sys.Date(), end = Sys.Date(), separator = " à ", format = "yyyy-mm-dd")), tabName = "date_filter"),
     convertMenuItem(menuItem("Responsables", tabName = "user_filter", icon = icon("info-circle"), numericInput("sciper", "Choisir le sciper d'un responsable :", value = NULL), textInput("hostname", "Choisir le hostname d'un certificat :", value = "")), tabName = "user_filter")
   )
 )
@@ -94,18 +99,20 @@ server <- function(input, output) {
     dropdownMenu(type = "notifications", notif)
   })
 
-  # TODO : afficher details des certificats
-  # TODO : nouvel onglet pour ligne selectionnee -> https://stackoverflow.com/questions/45151436/shiny-datatable-popup-data-about-selected-row-in-a-new-window
   output$df_all <- renderDT({
-    datatable(tableau, options = list(searching = FALSE), class = 'stripe hover')
+    if (length(input$columns) > 0) {
+        selected_columns <- input$columns
+        data <- table_all[, selected_columns, drop = FALSE]
+        datatable(data, options = list(searching = FALSE), class = 'stripe hover')
+    } else {
+        datatable(data.frame(Message = "Aucune colonne sélectionnée !"), options = list(searching = FALSE), class = 'stripe hover', rownames = FALSE)
+    }
   })
 
   output$df_date <- renderDT({
-    if (is.null(input$date_fin_max)) {
-      info_cert <- tableau
-    } else {
-      info_cert <- tableau %>% filter(date_fin <= input$date_fin_max)
-    }
+    date_fin_min <- input$date_fin_plage[1]
+    date_fin_max <- input$date_fin_plage[2]
+    info_cert <- table %>% filter(date_fin >= date_fin_min & date_fin <= date_fin_max)
     datatable(info_cert, options = list(searching = FALSE), class = 'stripe hover')
   })
 
@@ -114,15 +121,15 @@ server <- function(input, output) {
     hn <- input$hostname
     # TODO : trouver un autre type pour sciper car si numeric alors nombre negatif autorise + fleches pour faire +/- 2, 3, ... mais pas de lettres sauf e
     if (is.na(sciper) && hn == "") {
-      info_cert <- tableau
+      info_cert <- table
     } else if (!is.na(sciper) && hn == "") {
       ips <- dbGetQuery(con_sqlite, sprintf("SELECT User.id_user, User.sciper, Server.id_ip, Server.ip FROM User LEFT JOIN Server_User ON User.id_user = Server_User.id_user LEFT JOIN Server ON Server_User.id_ip = Server.id_ip WHERE sciper = %s;", sciper))
-      info_cert <- tableau %>% filter(ip %in% ips$ip)
+      info_cert <- table %>% filter(ip %in% ips$ip)
      } else if (is.na(sciper) && hn != "") {
-      info_cert <- tableau %>% filter(hostname == hn)
+      info_cert <- table %>% filter(hostname == hn)
      } else {
       ips <- dbGetQuery(con_sqlite, sprintf("SELECT User.id_user, User.sciper, Server.id_ip, Server.ip FROM User LEFT JOIN Server_User ON User.id_user = Server_User.id_user LEFT JOIN Server ON Server_User.id_ip = Server.id_ip WHERE sciper = %s;", sciper))
-      info_cert <- tableau %>% filter(ip %in% ips$ip) %>% filter(hostname == hn)
+      info_cert <- table %>% filter(ip %in% ips$ip) %>% filter(hostname == hn)
      }
      # TODO : simplifier ci-dessus
     datatable(info_cert, selection = 'single', options = list(searching = FALSE), class = 'stripe hover')
@@ -131,12 +138,11 @@ server <- function(input, output) {
   output$df_resp <- renderDT({
     # FIXME : trouver un moyen pour ne pas dupliquer le code
     sciper <- input$sciper
-    # TODO : trouver un autre type pour sciper car si numeric alors nombre negatif autorise + fleches pour faire +/- 2, 3, ... mais pas de lettres sauf e
     if (is.na(sciper)) {
-      info_cert <- tableau
+      info_cert <- table
     } else {
       ips <- dbGetQuery(con_sqlite, sprintf("SELECT User.id_user, User.sciper, Server.id_ip, Server.ip FROM User LEFT JOIN Server_User ON User.id_user = Server_User.id_user LEFT JOIN Server ON Server_User.id_ip = Server.id_ip WHERE sciper = %s;", sciper))
-      info_cert <- tableau %>% filter(ip %in% ips$ip)
+      info_cert <- table %>% filter(ip %in% ips$ip)
      }
     
     req(input$df_user_rows_selected) # affichage uniquement si ligne selectionnee
@@ -144,10 +150,9 @@ server <- function(input, output) {
     ip <- info_cert[selected_row, ]$ip
     info_user <- dbGetQuery(con_sqlite, sprintf("SELECT sciper, cn, email, rifs_flag, adminit_flag FROM Server LEFT JOIN Server_User ON Server.id_ip = Server_User.id_ip LEFT JOIN User ON Server_User.id_user = User.id_user WHERE Server.ip = '%s';", ip))
     info_user <- info_user %>% rename(nom = cn, rifs = rifs_flag, adminit = adminit_flag) %>% mutate(rifs = ifelse(rifs == 1, "x", ""), adminit = ifelse(adminit == 1, "x", ""))
-    # TODO : changer le sytle de l'affichage
+    # TODO : changer le style de l'affichage
     datatable(info_user, options = list(searching = FALSE), class = 'stripe hover')
   })
-
 }
 
 shinyApp(ui, server)
