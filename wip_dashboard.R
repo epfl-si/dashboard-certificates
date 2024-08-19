@@ -1,3 +1,4 @@
+# TODO : mettre tout sur un onglet
 # TODO : changer type d'input pour troisieme onglet
 # TODO : ajouter onglet avec diagramme pour visualiser combien de certificats avec echeance dans 1 semaine, 1 mois, 1 annee, ...
 # MAYBE : info cert + resp sur meme onglet ou en ouvrant nouvel onglet quand clic sur ligne (https://stackoverflow.com/questions/45151436/shiny-datatable-popup-data-about-selected-row-in-a-new-window)
@@ -40,6 +41,8 @@ table_all <- ssl_data
 subject <- ssl_data$subject
 issuer <- ssl_data$issuer
 proto <- ssl_data$proto
+# cmdb$iaas utile ?
+
 # noms des colonnes
 column_default <- c("hostname", "ip", "date_debut", "date_fin")
 column_choices <- names(table_all)
@@ -62,7 +65,7 @@ sidebar <- dashboardSidebar(
   sidebarMenu(
     convertMenuItem(menuItem("Vue globale", tabName = "listing", icon = icon("list"), checkboxGroupInput("columns", "Choisissez les colonnes à afficher :", choices = column_choices, selected = column_default)), tabName = "listing"),
     convertMenuItem(menuItem("Echéances", tabName = "date_filter", icon = icon("circle-exclamation"), dateRangeInput("date_fin_plage", label = "Choisir la période comprenant la date d'échéance :", start = Sys.Date(), end = Sys.Date(), separator = " à ", format = "yyyy-mm-dd")), tabName = "date_filter"),
-    convertMenuItem(menuItem("Responsables", tabName = "user_filter", icon = icon("info-circle"), numericInput("sciper", "Choisir le sciper d'un responsable :", value = NULL), textInput("hostname", "Choisir le hostname d'un certificat :", value = "")), tabName = "user_filter")
+    convertMenuItem(menuItem("Responsables", tabName = "user_filter", icon = icon("info-circle"), textInput("sciper", "Choisir le sciper d'un responsable :", value = ""), textInput("hostname", "Choisir le hostname d'un certificat :", value = "")), tabName = "user_filter")
   )
 )
 
@@ -119,7 +122,11 @@ server <- function(input, output) {
   output$df_user <- renderDT({
     sciper <- input$sciper
     hn <- input$hostname
-    # TODO : trouver un autre type pour sciper car si numeric alors nombre negatif autorise + fleches pour faire +/- 2, 3, ... mais pas de lettres sauf e
+    if (grepl("^[0-9]*$", sciper)) {
+      sciper <- as.integer(sciper)
+    } else {
+      sciper <- NA
+    }
     if (is.na(sciper) && hn == "") {
       info_cert <- table
     } else if (!is.na(sciper) && hn == "") {
@@ -138,6 +145,11 @@ server <- function(input, output) {
   output$df_resp <- renderDT({
     # FIXME : trouver un moyen pour ne pas dupliquer le code
     sciper <- input$sciper
+    if (grepl("^[0-9]*$", sciper)) {
+      sciper <- as.integer(sciper)
+    } else {
+      sciper <- NA
+    }
     if (is.na(sciper)) {
       info_cert <- table
     } else {
@@ -150,6 +162,7 @@ server <- function(input, output) {
     ip <- info_cert[selected_row, ]$ip
     info_user <- dbGetQuery(con_sqlite, sprintf("SELECT sciper, cn, email, rifs_flag, adminit_flag FROM Server LEFT JOIN Server_User ON Server.id_ip = Server_User.id_ip LEFT JOIN User ON Server_User.id_user = User.id_user WHERE Server.ip = '%s';", ip))
     info_user <- info_user %>% rename(nom = cn, rifs = rifs_flag, adminit = adminit_flag) %>% mutate(rifs = ifelse(rifs == 1, "x", ""), adminit = ifelse(adminit == 1, "x", ""))
+    # TODO : filtrer sur nom de famille ?
     # TODO : changer le style de l'affichage
     datatable(info_user, options = list(searching = FALSE), class = 'stripe hover')
   })
