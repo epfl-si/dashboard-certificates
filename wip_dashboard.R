@@ -42,10 +42,13 @@ proto <- ssl_data$proto
 column_default <- c("hostname", "ip", "date_debut", "date_fin")
 column_choices <- names(ssl_all)
 
+# noms des filtres
+filter_choices <- c("Période", "Responsable", "Hostname")
+
 # FIXME : trouver un moyen pour afficher les dates autrement mais garder le tri dynamique possible
 
 # TODO : notifier quand echeance proche
-text_notification <- "TODO"
+text_notification <- "..."
 
 # necessaire si filtre dans menu sinon erreur
 convertMenuItem <- function(mi,tabName) {
@@ -75,6 +78,8 @@ body <- dashboardBody(
     tabItem(tabName = "table",
       fluidPage(
         checkboxInput("expired_filter", "Afficher les certificats échus ?", FALSE),
+        # TODO : finir choix pour activation des filtres
+        checkboxGroupInput("filter", "Choisissez les filtres à activer :", choices = filter_choices, selected = NULL),
         DTOutput("df_all"),
         # TODO : ajouter ligne et titre uniquement si ligne selectionnee
         hr(style = "border-color: black;"),
@@ -90,7 +95,7 @@ ui <- dashboardPage(skin = "red",
   body
 )
 
-server <- function(input, output) {
+server <- function(input, output, session) {
   output$notifOutput <- renderMenu({
     notif <- notificationItem(text_notification, icon = icon("warning"))
     dropdownMenu(type = "notifications", notif)
@@ -144,6 +149,11 @@ server <- function(input, output) {
     # FIXME : filtrer sur quelle colonne a la base ?
     datatable(info_user, options = list(searching = FALSE, pageLength = 20), class = 'stripe hover')
   })
+
+  # TODO : afficher les details du certificat (prendre exemple sur vrai)
+  observeEvent(input$df_all_rows_selected, { showModal(modalDialog(title = "Informations du certificat", filtered_data()[input$df_all_rows_selected,], footer = modalButton("Fermer"))) })
 }
 
 shinyApp(ui, server)
+
+# TODO : ajouter un onglet avec graphiques selon echeances courtes, moyennes, longues, ... et autres
