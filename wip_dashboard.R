@@ -42,9 +42,6 @@ proto <- ssl_data$proto
 column_default <- c("hostname", "ip", "date_debut", "date_fin")
 column_choices <- names(ssl_all)
 
-# noms des filtres
-filter_choices <- c("Période", "Responsable", "Hostname")
-
 # FIXME : trouver un moyen pour afficher les dates autrement mais garder le tri dynamique possible
 
 # TODO : notifier quand echeance proche
@@ -62,12 +59,20 @@ header <- dashboardHeader(title = "Certificats SSL", dropdownMenuOutput("notifOu
 sidebar <- dashboardSidebar(
   sidebarMenu(
     convertMenuItem(
-      menuItem("Vue globale",
+      menuItem("Filtres",
         tabName = "table",
         icon = icon("list"),
+        checkboxInput("expired_filter", "Afficher les certificats échus ?", FALSE),
+        hr(style = "border-color: black;"),
+        checkboxInput("periode_filter", "Filtrer selon la période ?", FALSE),
         dateRangeInput("date_fin_plage", label = "Choisir la période comprenant la date d'échéance :", start = Sys.Date(), end = Sys.Date(), separator = " à ", format = "yyyy-mm-dd"),
+        hr(style = "border-color: black;"),
+        checkboxInput("resp_filter", "Filtrer selon le responsable ?", FALSE),
         textInput("sciper", "Choisir le sciper d'un responsable :", value = ""),
+        hr(style = "border-color: black;"),
+        checkboxInput("hostname_filter", "Filtrer selon le hostname ?", FALSE),
         textInput("hostname", "Choisir le hostname d'un certificat :", value = ""),
+        hr(style = "border-color: black;"),
         checkboxGroupInput("columns_current", "Choisir les colonnes à afficher :", choices = column_choices, selected = column_default)),
       tabName = "table")
   )
@@ -77,9 +82,6 @@ body <- dashboardBody(
   tabItems(
     tabItem(tabName = "table",
       fluidPage(
-        checkboxInput("expired_filter", "Afficher les certificats échus ?", FALSE),
-        # TODO : finir choix pour activation des filtres
-        checkboxGroupInput("filter", "Choisissez les filtres à activer :", choices = filter_choices, selected = NULL),
         DTOutput("df_all"),
         # TODO : ajouter ligne et titre uniquement si ligne selectionnee
         hr(style = "border-color: black;"),
@@ -107,22 +109,28 @@ server <- function(input, output, session) {
       # time
       date_fin_min <- input$date_fin_plage[1]
       date_fin_max <- input$date_fin_plage[2]
+      # FIXME : modifier code pour prendre en compte input$periode_filter et separer les deux conditons
       if (input$expired_filter) {
         data <- data %>% filter(date_fin >= date_fin_min & date_fin <= date_fin_max)
       } else {
         data <- data %>% filter(date_fin >= Sys.Date() & date_fin >= date_fin_min & date_fin <= date_fin_max)
       }
       # sciper
-      sciper <- input$sciper
-      if (grepl("^[0-9]*$", sciper) && sciper != "") {
-        sciper <- as.integer(sciper)
-        ips <- dbGetQuery(con_sqlite, sprintf("SELECT User.id_user, User.sciper, Server.id_ip, Server.ip FROM User LEFT JOIN Server_User ON User.id_user = Server_User.id_user LEFT JOIN Server ON Server_User.id_ip = Server.id_ip WHERE sciper = %s;", sciper))
-        data <- data %>% filter(ip %in% ips$ip)
+      if (input$resp_filter) {
+        sciper <- input$sciper
+        if (grepl("^[0-9]*$", sciper) && sciper != "") {
+          sciper <- as.integer(sciper)
+          ips <- dbGetQuery(con_sqlite, sprintf("SELECT User.id_user, User.sciper, Server.id_ip, Server.ip FROM User LEFT JOIN Server_User ON User.id_user = Server_User.id_user LEFT JOIN Server ON Server_User.id_ip = Server.id_ip WHERE sciper = %s;", sciper))
+          data <- data %>% filter(ip %in% ips$ip)
+        }
       }
+      
       # hostname
-      hn <- input$hostname
-      if (hn != "") {
-        data <- data %>% filter(hostname == hn)
+      if (input$hostname_filter) {
+        hn <- input$hostname
+        if (hn != "") {
+          data <- data %>% filter(hostname == hn)
+        }
       }
       return(data)
     } else {
