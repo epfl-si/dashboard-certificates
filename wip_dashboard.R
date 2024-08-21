@@ -62,7 +62,8 @@ sidebar <- dashboardSidebar(
       menuItem("Filtres",
         tabName = "table",
         icon = icon("list"),
-        checkboxInput("expired_filter", "Afficher les certificats échus ?", FALSE),
+        # FIXME : mieux d'avoir choix puis activation ou garder comme ca ?
+        checkboxInput("expired_filter", "Afficher les certificats échus ?", TRUE),
         hr(style = "border-color: black;"),
         checkboxInput("periode_filter", "Filtrer selon la période ?", FALSE),
         dateRangeInput("date_fin_plage", label = "Choisir la période comprenant la date d'échéance :", start = Sys.Date(), end = Sys.Date(), separator = " à ", format = "yyyy-mm-dd"),
@@ -106,15 +107,17 @@ server <- function(input, output, session) {
   filtered_data <- reactive({
     if (length(input$columns_current) > 0) {
       data <- ssl_all[, input$columns_current, drop = FALSE]
+      
       # time
       date_fin_min <- input$date_fin_plage[1]
       date_fin_max <- input$date_fin_plage[2]
-      # FIXME : modifier code pour prendre en compte input$periode_filter et separer les deux conditons
-      if (input$expired_filter) {
-        data <- data %>% filter(date_fin >= date_fin_min & date_fin <= date_fin_max)
-      } else {
-        data <- data %>% filter(date_fin >= Sys.Date() & date_fin >= date_fin_min & date_fin <= date_fin_max)
+      if(!input$expired_filter) {
+        data <- data %>% filter(date_fin >= Sys.Date())
       }
+      if(input$periode_filter) {
+        data <- data %>% filter(date_fin >= date_fin_min & date_fin <= date_fin_max)
+      }
+
       # sciper
       if (input$resp_filter) {
         sciper <- input$sciper
