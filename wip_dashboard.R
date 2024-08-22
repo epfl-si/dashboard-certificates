@@ -18,16 +18,21 @@ options(shiny.host = "0.0.0.0")
 options(shiny.port = 8180)
 
 # open connection with elasticsearch
-con_elasticsearch <- connect(host = host_elasticsearch, user = user_elasticsearch, pwd = password_elasticsearch, port = port_elasticsearch, transport_schema  = "http")
+con_elasticsearch <- connect(host = host_elasticsearch, user = user_elasticsearch, pwd = password_elasticsearch, port = port_elasticsearch, transport_schema = "http")
 # open connection with sqlite
 con_sqlite <- dbConnect(RSQLite::SQLite(), db_path)
 
 # import ssl data from elasticsearch
-ssl_data <- fromJSON(Search(con_elasticsearch, index = "ssl", size = 10000, raw = TRUE))$hits$hits$"_source" %>% mutate(ipv4 = as.character(ipv4)) %>% mutate(validFrom = as.Date(validFrom), validTo = as.Date(validTo)) %>% rename(ip = ipv4, date_debut = validFrom, date_fin = validTo)
+ssl_data <- fromJSON(Search(con_elasticsearch, index = "ssl", size = 10000, raw = TRUE))$hits$hits$"_source" %>%
+  mutate(ipv4 = as.character(ipv4)) %>%
+  mutate(validFrom = as.Date(validFrom), validTo = as.Date(validTo)) %>%
+  rename(ip = ipv4, date_debut = validFrom, date_fin = validTo)
 
 # tableau avec hostname, ip, date_debut et date_fin
 # FIXME : comment trier les donnees a la base (pour l'instant sur hostname partout) et quelles colonnes afficher a la base ?
-ssl_specific <- ssl_data %>% select(hostname, ip, date_debut, date_fin) %>% arrange(hostname)
+ssl_specific <- ssl_data %>%
+  select(hostname, ip, date_debut, date_fin) %>%
+  arrange(hostname)
 
 # tableau avec tout de ssl
 # TODO : formater les donnees de ssl et de cmdb pour donner la possibilite d'afficher toutes les colonnes utiles dans premier onglet
@@ -48,9 +53,9 @@ column_choices <- names(ssl_all)
 text_notification <- "..."
 
 # necessaire si filtre dans menu sinon erreur
-convertMenuItem <- function(mi,tabName) {
-  mi$children[[1]]$attribs['data-toggle'] <- "tab"
-  mi$children[[1]]$attribs['data-value'] <- tabName
+convertMenuItem <- function(mi, tabName) {
+  mi$children[[1]]$attribs["data-toggle"] <- "tab"
+  mi$children[[1]]$attribs["data-value"] <- tabName
   mi
 }
 
@@ -59,40 +64,73 @@ header <- dashboardHeader(title = "Certificats SSL", dropdownMenuOutput("notifOu
 sidebar <- dashboardSidebar(
   sidebarMenu(
     convertMenuItem(
-      menuItem("Filtres",
+      menuItem("Choix des colonnes",
         tabName = "table",
         icon = icon("list"),
-        # FIXME : mieux d'avoir choix puis activation ou garder comme ca ?
-        checkboxInput("expired_filter", "Afficher les certificats échus ?", TRUE),
-        hr(style = "border-color: black;"),
-        checkboxInput("periode_filter", "Filtrer selon la période ?", FALSE),
-        dateRangeInput("date_fin_plage", label = "Choisir la période comprenant la date d'échéance :", start = Sys.Date(), end = Sys.Date(), separator = " à ", format = "yyyy-mm-dd"),
-        hr(style = "border-color: black;"),
-        checkboxInput("resp_filter", "Filtrer selon le responsable ?", FALSE),
-        textInput("sciper", "Choisir le sciper d'un responsable :", value = ""),
-        hr(style = "border-color: black;"),
-        checkboxInput("hostname_filter", "Filtrer selon le hostname ?", FALSE),
-        textInput("hostname", "Choisir le hostname d'un certificat :", value = ""),
-        hr(style = "border-color: black;"),
-        checkboxGroupInput("columns_current", "Choisir les colonnes à afficher :", choices = column_choices, selected = column_default)),
-      tabName = "table")
+        checkboxGroupInput("columns_current", label = NULL, choices = column_choices, selected = column_default)
+      ),
+      tabName = "table"
+    )
   )
 )
 
 body <- dashboardBody(
+  tags$style(HTML("
+      .custom-box {
+        min-height: auto;
+        height: auto;
+        width: auto;
+        overflow: auto;
+        padding: 10px;
+      }
+    ")),
   tabItems(
-    tabItem(tabName = "table",
+    tabItem(
+      tabName = "table",
       fluidPage(
-        DTOutput("df_all"),
-        # TODO : ajouter ligne et titre uniquement si ligne selectionnee
+        fluidRow(
+          column(
+            width = 2,
+            div(class = "custom-box"),
+            box(
+              height = NULL, width = NULL,
+              h4(strong("Choix des filtres :"), style = "text-align: center;"),
+              # FIXME : mieux d'avoir choix puis activation ou garder comme ca ?
+              checkboxInput("expired_filter", "Afficher les certificats échus ?", TRUE),
+              hr(style = "border-color: black;"),
+              checkboxInput("periode_filter", "Filtrer selon la période ?", FALSE),
+              conditionalPanel(
+                condition = "input.periode_filter == true", dateRangeInput("date_fin_plage", label = "Période comprenant la date d'échéance :", start = Sys.Date(), end = Sys.Date(), separator = " à ", format = "yyyy-mm-dd")
+              ),
+              hr(style = "border-color: black;"),
+              checkboxInput("resp_filter", "Filtrer selon le responsable ?", FALSE),
+              conditionalPanel(
+                condition = "input.resp_filter == true", textInput("sciper", "Sciper d'un responsable :", value = "")
+              ),
+              hr(style = "border-color: black;"),
+              checkboxInput("hostname_filter", "Filtrer selon le hostname ?", FALSE),
+              conditionalPanel(
+                condition = "input.hostname_filter == true", textInput("hostname", "Hostname d'un certificat :", value = "")
+              )
+            )
+          ),
+          column(
+            width = 10,
+            h4(strong("Affichage des échéances des certificats :"), style = "text-align: center;"),
+            DTOutput("df_all")
+          )
+        ),
         hr(style = "border-color: black;"),
-        h2("Détails des responsables", style = "text-align: center;"),
-        DTOutput("df_resp")
-      ))
+        fluidRow(
+          DTOutput("df_resp")
+        )
+      )
+    )
   )
 )
 
-ui <- dashboardPage(skin = "red",
+ui <- dashboardPage(
+  skin = "red",
   header,
   sidebar,
   body
@@ -107,14 +145,14 @@ server <- function(input, output, session) {
   filtered_data <- reactive({
     if (length(input$columns_current) > 0) {
       data <- ssl_all[, input$columns_current, drop = FALSE]
-      
+
       # time
       date_fin_min <- input$date_fin_plage[1]
       date_fin_max <- input$date_fin_plage[2]
-      if(!input$expired_filter) {
+      if (!input$expired_filter) {
         data <- data %>% filter(date_fin >= Sys.Date())
       }
-      if(input$periode_filter) {
+      if (input$periode_filter) {
         data <- data %>% filter(date_fin >= date_fin_min & date_fin <= date_fin_max)
       }
 
@@ -127,7 +165,7 @@ server <- function(input, output, session) {
           data <- data %>% filter(ip %in% ips$ip)
         }
       }
-      
+
       # hostname
       if (input$hostname_filter) {
         hn <- input$hostname
@@ -143,10 +181,10 @@ server <- function(input, output, session) {
 
   output$df_all <- renderDT({
     data_used <- filtered_data()
-    if (!is.null(data)) {
-      datatable(data_used, selection = 'single', options = list(searching = FALSE, pageLength = 20), class = 'stripe hover')
+    if (!is.null(data_used)) {
+      datatable(data_used, selection = "single", options = list(dom = "frtip", pageLength = 10), class = "stripe hover", rownames = FALSE)
     } else {
-      datatable(data.frame(Message = "Aucune colonne sélectionnée !"), selection = 'single', options = list(searching = FALSE, pageLength = 20), class = 'stripe hover', rownames = FALSE)
+      datatable(data.frame(Message = "Aucune colonne sélectionnée !"), selection = "single", options = list(dom = "rtip", pageLength = 10), class = "stripe hover", rownames = FALSE)
     }
   })
 
@@ -156,15 +194,28 @@ server <- function(input, output, session) {
     selected_data <- filtered_data()[selected_row, , drop = FALSE]
     ip <- selected_data$ip
     info_user <- dbGetQuery(con_sqlite, sprintf("SELECT sciper, cn, email, rifs_flag, adminit_flag FROM Server LEFT JOIN Server_User ON Server.id_ip = Server_User.id_ip LEFT JOIN User ON Server_User.id_user = User.id_user WHERE Server.ip = '%s';", ip))
-    info_user <- info_user %>% rename(nom = cn, rifs = rifs_flag, adminit = adminit_flag) %>% mutate(rifs = ifelse(rifs == 1, "x", ""), adminit = ifelse(adminit == 1, "x", "")) %>% arrange (nom)
+    info_user <- info_user %>%
+      rename(nom = cn, rifs = rifs_flag, adminit = adminit_flag) %>%
+      mutate(rifs = ifelse(rifs == 1, "x", ""), adminit = ifelse(adminit == 1, "x", "")) %>%
+      arrange(nom)
     # FIXME : filtrer sur quelle colonne a la base ?
-    datatable(info_user, options = list(searching = FALSE, pageLength = 20), class = 'stripe hover')
+    datatable(info_user, options = list(searching = TRUE, pageLength = 10), class = "stripe hover", rownames = FALSE)
   })
 
   # TODO : afficher les details du certificat (prendre exemple sur vrai)
-  observeEvent(input$df_all_rows_selected, { showModal(modalDialog(title = "Informations du certificat", filtered_data()[input$df_all_rows_selected,], footer = modalButton("Fermer"))) })
+  observeEvent(input$df_all_rows_selected, {
+    showModal(modalDialog(title = "Informations du certificat", filtered_data()[input$df_all_rows_selected, ], footer = modalButton("Fermer")))
+  })
 }
 
 shinyApp(ui, server)
 
+
+# TODO : s'occuper du titre et des details pour responsables (deuxieme partie du dashboard)
+# TODO : fixer erreur d'affichage quand choix de la date car plus responsive
 # TODO : ajouter un onglet avec graphiques selon echeances courtes, moyennes, longues, ... et autres
+
+
+# cert_titles <- c("Subject Name", "Issuer Name", "Validity", "Subject Alt Names", "Public Key Info", "Miscellaneous", "Fingerprints", "Basic Constraints", "Key Usages", "Extended Key Usages", "Subject Key ID", "Authority Key ID", "Authority Info (AIA)", "Certificate Policies", "Embedded STCs")
+# cert_values <- c(c("Common Name"), c("Country", "State/Province", "Locality", "organization", "Common Name"), c("Not Before", "Not After"), c("DNS Name", ...), c(), c(), c(), c(), c(), c(), c(), c(), c(), c(), c())
+# z_subject <- ssl_data$subject$CN
