@@ -13,6 +13,7 @@ library(dplyr)
 library(jsonlite)
 library(roperators)
 library(log4r)
+library(tidyr)
 
 options(shiny.host = "0.0.0.0")
 options(shiny.port = 8180)
@@ -121,6 +122,9 @@ body <- dashboardBody(
           )
         ),
         hr(style = "border-color: black;"),
+        # conditionalPanel(
+        #  condition = "input.df_all_rows_selected != null", h4(strong("Affichage des responsables du certificat sélectionné :"), style = "text-align: center;")
+        # ),
         fluidRow(
           DTOutput("df_resp")
         )
@@ -199,23 +203,71 @@ server <- function(input, output, session) {
       mutate(rifs = ifelse(rifs == 1, "x", ""), adminit = ifelse(adminit == 1, "x", "")) %>%
       arrange(nom)
     # FIXME : filtrer sur quelle colonne a la base ?
-    datatable(info_user, options = list(searching = TRUE, pageLength = 10), class = "stripe hover", rownames = FALSE)
+    datatable(info_user, caption = "Affichage des responsables du certificat sélectionné :", options = list(searching = TRUE, pageLength = 10), class = "stripe hover", rownames = FALSE)
   })
 
-  # TODO : afficher les details du certificat (prendre exemple sur vrai)
   observeEvent(input$df_all_rows_selected, {
-    showModal(modalDialog(title = "Informations du certificat", filtered_data()[input$df_all_rows_selected, ], footer = modalButton("Fermer")))
+    row_selected <- filtered_data()[input$df_all_rows_selected, ]
+    cert_data <- ssl_all[ssl_all$ip == row_selected$ip & ssl_all$hostname == row_selected$hostname, ]
+
+    output$subject_name <- renderTable({
+      cert_data$subject %>%
+        select(CN) %>%
+        rename("Common Name" = CN)
+    })
+
+    # FIXME : comment faire pour ne pas afficher les titre de colonnes ?
+    # output$issuer_name <- renderTable({
+    #  df <- cert_data$issuer %>% select(C, ST, L, O, CN) %>% rename("Country :" = C, "State/Province :" = ST, "Locality :" = L, "Organization :" = O, "Common Name :" = CN)
+    #  df_convert <- df %>% pivot_longer(cols = everything(), names_to = "name", values_to = "value")
+    #  df_convert
+    # })
+
+    output$issuer_name <- renderTable({
+      cert_data$issuer %>%
+        select(C, ST, L, O, CN) %>%
+        rename("Country" = C, "State/Province" = ST, "Locality" = L, "Organization" = O, "Common Name" = CN)
+    })
+
+    output$validity <- renderTable({
+      # FIXME : probleme avec affichage des dates
+      cert_data %>%
+        select(date_debut, date_fin) %>%
+        rename("Not Before" = date_debut, "Not After" = date_fin)
+    })
+
+    output$subject_alt_names <- renderTable({
+      san <- cert_data %>% select(san)
+      as.data.frame(lapply(san, function(col) {
+        if (is.list(col)) {
+          sapply(col, paste, collapse = ", ")
+        } else {
+          col
+        }
+      })) %>% rename("DNS Name" = san)
+    })
+
+    showModal(modalDialog(title = "Informations du certificat", "Subject Name", tableOutput("subject_name"), tags$hr(style = "border-top: 1px solid #000;"), "Issuer Name", tableOutput("issuer_name"), tags$hr(style = "border-top: 1px solid #000;"), "Validity", tableOutput("validity"), tags$hr(style = "border-top: 1px solid #000;"), "Subject Alt Names", tableOutput("subject_alt_names"), footer = modalButton("Fermer")))
   })
 }
 
 shinyApp(ui, server)
 
-
-# TODO : s'occuper du titre et des details pour responsables (deuxieme partie du dashboard)
 # TODO : fixer erreur d'affichage quand choix de la date car plus responsive
 # TODO : ajouter un onglet avec graphiques selon echeances courtes, moyennes, longues, ... et autres
 
 
-# cert_titles <- c("Subject Name", "Issuer Name", "Validity", "Subject Alt Names", "Public Key Info", "Miscellaneous", "Fingerprints", "Basic Constraints", "Key Usages", "Extended Key Usages", "Subject Key ID", "Authority Key ID", "Authority Info (AIA)", "Certificate Policies", "Embedded STCs")
-# cert_values <- c(c("Common Name"), c("Country", "State/Province", "Locality", "organization", "Common Name"), c("Not Before", "Not After"), c("DNS Name", ...), c(), c(), c(), c(), c(), c(), c(), c(), c(), c(), c())
-# z_subject <- ssl_data$subject$CN
+# cert_titles <- c("Public Key Info", "Miscellaneous", "Fingerprints", "Basic Constraints", "Key Usages", "Extended Key Usages", "Subject Key ID", "Authority Key ID", "Authority Info (AIA)", "Certificate Policies", "Embedded STCs")
+
+# FIXME : quelles infos pour parties ci-dessous ?
+# public key info
+# miscellaneous
+# fingerprints
+# basic constraints
+# key usages
+# extended key usages
+# subject key id
+# authority key id
+# authority info (AIA)
+# certificate policies
+# embedded STCs
