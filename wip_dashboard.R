@@ -14,6 +14,8 @@ library(jsonlite)
 library(roperators)
 library(log4r)
 library(tidyr)
+library(kableExtra)
+library(knitr)
 
 options(shiny.host = "0.0.0.0")
 options(shiny.port = 8180)
@@ -30,13 +32,12 @@ ssl_data <- fromJSON(Search(con_elasticsearch, index = "ssl", size = 10000, raw 
   rename(ip = ipv4, date_debut = validFrom, date_fin = validTo)
 
 # tableau avec hostname, ip, date_debut et date_fin
-# FIXME : comment trier les donnees a la base (pour l'instant sur hostname partout) et quelles colonnes afficher a la base ?
 ssl_specific <- ssl_data %>%
   select(hostname, ip, date_debut, date_fin) %>%
   arrange(hostname)
 
 # tableau avec tout de ssl
-# TODO : formater les donnees de ssl et de cmdb pour donner la possibilite d'afficher toutes les colonnes utiles dans premier onglet
+# TODO : formater les donnees de ssl et de cmdb pour donner la possibilite d'afficher toutes les colonnes utiles dans tableau principal
 ssl_all <- ssl_data
 # FIXME : besoin des donnees de ces sous-tableaux pour afficher les details ?
 subject <- ssl_data$subject
@@ -47,8 +48,6 @@ proto <- ssl_data$proto
 # noms des colonnes
 column_default <- c("hostname", "ip", "date_debut", "date_fin")
 column_choices <- names(ssl_all)
-
-# FIXME : trouver un moyen pour afficher les dates autrement mais garder le tri dynamique possible
 
 # TODO : notifier quand echeance proche
 text_notification <- "..."
@@ -76,27 +75,16 @@ sidebar <- dashboardSidebar(
 )
 
 body <- dashboardBody(
-  tags$style(HTML("
-      .custom-box {
-        min-height: auto;
-        height: auto;
-        width: auto;
-        overflow: auto;
-        padding: 10px;
-      }
-    ")),
   tabItems(
     tabItem(
       tabName = "table",
       fluidPage(
         fluidRow(
           column(
-            width = 2,
-            div(class = "custom-box"),
+            width = 3,
             box(
-              height = NULL, width = NULL,
+              width = NULL,
               h4(strong("Choix des filtres :"), style = "text-align: center;"),
-              # FIXME : mieux d'avoir choix puis activation ou garder comme ca ?
               checkboxInput("expired_filter", "Afficher les certificats échus ?", TRUE),
               hr(style = "border-color: black;"),
               checkboxInput("periode_filter", "Filtrer selon la période ?", FALSE),
@@ -116,16 +104,16 @@ body <- dashboardBody(
             )
           ),
           column(
-            width = 10,
+            width = 9,
             h4(strong("Affichage des échéances des certificats :"), style = "text-align: center;"),
             DTOutput("df_all")
           )
         ),
-        hr(style = "border-color: black;"),
-        # conditionalPanel(
-        #  condition = "input.df_all_rows_selected != null", h4(strong("Affichage des responsables du certificat sélectionné :"), style = "text-align: center;")
-        # ),
         fluidRow(
+          hr(style = "border-color: black;"),
+          conditionalPanel(
+            condition = "input.df_all_rows_selected.length > 0", h4(strong("Affichage des responsables du certificat sélectionné :"), style = "text-align: center;")
+          ),
           DTOutput("df_resp")
         )
       )
@@ -202,8 +190,7 @@ server <- function(input, output, session) {
       rename(nom = cn, rifs = rifs_flag, adminit = adminit_flag) %>%
       mutate(rifs = ifelse(rifs == 1, "x", ""), adminit = ifelse(adminit == 1, "x", "")) %>%
       arrange(nom)
-    # FIXME : filtrer sur quelle colonne a la base ?
-    datatable(info_user, caption = "Affichage des responsables du certificat sélectionné :", options = list(searching = TRUE, pageLength = 10), class = "stripe hover", rownames = FALSE)
+    datatable(info_user, options = list(searching = TRUE, pageLength = 10), class = "stripe hover", rownames = FALSE)
   })
 
   observeEvent(input$df_all_rows_selected, {
@@ -216,24 +203,19 @@ server <- function(input, output, session) {
         rename("Common Name" = CN)
     })
 
-    # FIXME : comment faire pour ne pas afficher les titre de colonnes ?
-    # output$issuer_name <- renderTable({
-    #  df <- cert_data$issuer %>% select(C, ST, L, O, CN) %>% rename("Country :" = C, "State/Province :" = ST, "Locality :" = L, "Organization :" = O, "Common Name :" = CN)
-    #  df_convert <- df %>% pivot_longer(cols = everything(), names_to = "name", values_to = "value")
-    #  df_convert
-    # })
-
     output$issuer_name <- renderTable({
       cert_data$issuer %>%
         select(C, ST, L, O, CN) %>%
         rename("Country" = C, "State/Province" = ST, "Locality" = L, "Organization" = O, "Common Name" = CN)
     })
 
-    output$validity <- renderTable({
-      # FIXME : probleme avec affichage des dates
+    output$validity <- renderUI({
       cert_data %>%
         select(date_debut, date_fin) %>%
-        rename("Not Before" = date_debut, "Not After" = date_fin)
+        rename("Not Before" = date_debut, "Not After" = date_fin) %>%
+        kable(format = "html", row.names = FALSE) %>%
+        kable_styling() %>%
+        HTML()
     })
 
     output$subject_alt_names <- renderTable({
@@ -247,15 +229,11 @@ server <- function(input, output, session) {
       })) %>% rename("DNS Name" = san)
     })
 
-    showModal(modalDialog(title = "Informations du certificat", "Subject Name", tableOutput("subject_name"), tags$hr(style = "border-top: 1px solid #000;"), "Issuer Name", tableOutput("issuer_name"), tags$hr(style = "border-top: 1px solid #000;"), "Validity", tableOutput("validity"), tags$hr(style = "border-top: 1px solid #000;"), "Subject Alt Names", tableOutput("subject_alt_names"), footer = modalButton("Fermer")))
+    showModal(modalDialog(title = "Informations du certificat", "Subject Name", tableOutput("subject_name"), tags$hr(style = "border-top: 1px solid #000;"), "Issuer Name", tableOutput("issuer_name"), tags$hr(style = "border-top: 1px solid #000;"), "Validity", uiOutput("validity"), tags$hr(style = "border-top: 1px solid #000;"), "Subject Alt Names", tableOutput("subject_alt_names"), footer = modalButton("Fermer")))
   })
 }
 
 shinyApp(ui, server)
-
-# TODO : fixer erreur d'affichage quand choix de la date car plus responsive
-# TODO : ajouter un onglet avec graphiques selon echeances courtes, moyennes, longues, ... et autres
-
 
 # cert_titles <- c("Public Key Info", "Miscellaneous", "Fingerprints", "Basic Constraints", "Key Usages", "Extended Key Usages", "Subject Key ID", "Authority Key ID", "Authority Info (AIA)", "Certificate Policies", "Embedded STCs")
 
