@@ -62,6 +62,7 @@ convertMenuItem <- function(mi, tabName) {
 header <- dashboardHeader(title = "Certificats SSL", dropdownMenuOutput("notifOutput"))
 
 sidebar <- dashboardSidebar(
+  collapsed = TRUE,
   sidebarMenu(
     convertMenuItem(
       menuItem("Choix des colonnes",
@@ -174,7 +175,7 @@ server <- function(input, output, session) {
   output$df_all <- renderDT({
     data_used <- filtered_data()
     if (!is.null(data_used)) {
-      datatable(data_used, selection = "single", options = list(dom = "frtip", pageLength = 10), class = "stripe hover", rownames = FALSE)
+      datatable(data_used, escape = FALSE, selection = "single", options = list(scrollX = TRUE, dom = "frtip", pageLength = 10), class = "stripe hover", rownames = FALSE)
     } else {
       datatable(data.frame(Message = "Aucune colonne sélectionnée !"), selection = "single", options = list(dom = "rtip", pageLength = 10), class = "stripe hover", rownames = FALSE)
     }
@@ -229,7 +230,7 @@ server <- function(input, output, session) {
       })) %>% rename("DNS Name" = san)
     })
 
-    showModal(modalDialog(title = "Informations du certificat", "Subject Name", tableOutput("subject_name"), tags$hr(style = "border-top: 1px solid #000;"), "Issuer Name", tableOutput("issuer_name"), tags$hr(style = "border-top: 1px solid #000;"), "Validity", uiOutput("validity"), tags$hr(style = "border-top: 1px solid #000;"), "Subject Alt Names", tableOutput("subject_alt_names"), footer = modalButton("Fermer")))
+    showModal(modalDialog(title = "Informations du certificat", easyClose = TRUE, "Subject Name", tableOutput("subject_name"), tags$hr(style = "border-top: 1px solid #000;"), "Issuer Name", tableOutput("issuer_name"), tags$hr(style = "border-top: 1px solid #000;"), "Validity", uiOutput("validity"), tags$hr(style = "border-top: 1px solid #000;"), "Subject Alt Names", tableOutput("subject_alt_names"), footer = modalButton("Fermer")))
   })
 }
 
