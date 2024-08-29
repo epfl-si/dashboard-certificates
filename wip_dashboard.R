@@ -45,9 +45,10 @@ issuer <- ssl_data$issuer
 proto <- ssl_data$proto
 # cmdb$iaas utile ?
 
-# noms des colonnes
-column_default <- c("hostname", "ip", "date_debut", "date_fin")
+# noms des colonnes (sans ip et hostname car rajoutes plus tard)
+column_default <- c("date_debut", "date_fin")
 column_choices <- names(ssl_all)
+column_choices <- column_choices[column_choices != "ip" & column_choices != "hostname"]
 
 # TODO : notifier quand echeance proche
 text_notification <- "..."
@@ -136,44 +137,52 @@ server <- function(input, output, session) {
   })
 
   filtered_data <- reactive({
-    if (length(input$columns_current) > 0) {
-      data_filtred <- ssl_all
+    data_filtred <- ssl_all
 
-      # time
-      date_fin_min <- input$date_fin_plage[1]
-      date_fin_max <- input$date_fin_plage[2]
-      if (!input$expired_filter) {
-        data_filtred <- data_filtred %>% filter(date_fin >= Sys.Date())
-      }
-      if (input$periode_filter) {
-        data_filtred <- data_filtred %>% filter(date_fin >= date_fin_min & date_fin <= date_fin_max)
-      }
-
-      # sciper
-      if (input$resp_filter) {
-        sciper <- input$sciper
-        if (grepl("^[0-9]*$", sciper) && sciper != "") {
-          sciper <- as.integer(sciper)
-          ips <- dbGetQuery(con_sqlite, sprintf("SELECT User.id_user, User.sciper, Server.id_ip, Server.ip FROM User LEFT JOIN Server_User ON User.id_user = Server_User.id_user LEFT JOIN Server ON Server_User.id_ip = Server.id_ip WHERE sciper = %s;", sciper))
-          data_filtred <- data_filtred %>% filter(ip %in% ips$ip)
-        }
-      }
-
-      # hostname
-      if (input$hostname_filter) {
-        hn <- input$hostname
-        if (hn != "") {
-          data_filtred <- data_filtred %>% filter(hostname == hn)
-        }
-      }
-
-      # choice of columns
-      data <- data_filtred[, input$columns_current, drop = FALSE]
-
-      return(data)
-    } else {
-      return(NULL)
+    # time
+    date_fin_min <- input$date_fin_plage[1]
+    date_fin_max <- input$date_fin_plage[2]
+    if (!input$expired_filter) {
+      data_filtred <- data_filtred %>% filter(date_fin >= Sys.Date())
     }
+    if (input$periode_filter && date_fin_min <= date_fin_max) {
+      data_filtred <- data_filtred %>% filter(date_fin >= date_fin_min & date_fin <= date_fin_max)
+    }
+
+    # sciper
+    if (input$resp_filter) {
+      sciper <- input$sciper
+      if (grepl("^[0-9]*$", sciper) && sciper != "") {
+        sciper <- as.integer(sciper)
+        ips <- dbGetQuery(con_sqlite, sprintf("SELECT User.id_user, User.sciper, Server.id_ip, Server.ip FROM User LEFT JOIN Server_User ON User.id_user = Server_User.id_user LEFT JOIN Server ON Server_User.id_ip = Server.id_ip WHERE sciper = %s;", sciper))
+        data_filtred <- data_filtred %>% filter(ip %in% ips$ip)
+      }
+    }
+
+    # hostname
+    if (input$hostname_filter) {
+      hn <- input$hostname
+      if (hn != "") {
+        data_filtred <- data_filtred %>% filter(hostname == hn)
+      }
+    }
+
+    # choice of columns
+    data <- data_filtred[, input$columns_current, drop = FALSE]
+
+    # add column with ip
+    data$ip <- data_filtred$ip
+    data <- data %>% select(ip, everything())
+
+    # add column with hostname
+    data$hostname <- data_filtred$hostname
+    data <- data %>% select(hostname, everything())
+
+    # add column to display pop up with certificate information
+    data$info <- '<i class=\"fa fa-info-circle\"></i>'
+    data <- data %>% select(info, everything())
+
+    return(data)
   })
 
   output$df_all <- renderDT({
