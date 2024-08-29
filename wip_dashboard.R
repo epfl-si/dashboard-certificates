@@ -137,16 +137,16 @@ server <- function(input, output, session) {
 
   filtered_data <- reactive({
     if (length(input$columns_current) > 0) {
-      data <- ssl_all[, input$columns_current, drop = FALSE]
+      data_filtred <- ssl_all
 
       # time
       date_fin_min <- input$date_fin_plage[1]
       date_fin_max <- input$date_fin_plage[2]
       if (!input$expired_filter) {
-        data <- data %>% filter(date_fin >= Sys.Date())
+        data_filtred <- data_filtred %>% filter(date_fin >= Sys.Date())
       }
       if (input$periode_filter) {
-        data <- data %>% filter(date_fin >= date_fin_min & date_fin <= date_fin_max)
+        data_filtred <- data_filtred %>% filter(date_fin >= date_fin_min & date_fin <= date_fin_max)
       }
 
       # sciper
@@ -155,7 +155,7 @@ server <- function(input, output, session) {
         if (grepl("^[0-9]*$", sciper) && sciper != "") {
           sciper <- as.integer(sciper)
           ips <- dbGetQuery(con_sqlite, sprintf("SELECT User.id_user, User.sciper, Server.id_ip, Server.ip FROM User LEFT JOIN Server_User ON User.id_user = Server_User.id_user LEFT JOIN Server ON Server_User.id_ip = Server.id_ip WHERE sciper = %s;", sciper))
-          data <- data %>% filter(ip %in% ips$ip)
+          data_filtred <- data_filtred %>% filter(ip %in% ips$ip)
         }
       }
 
@@ -163,9 +163,13 @@ server <- function(input, output, session) {
       if (input$hostname_filter) {
         hn <- input$hostname
         if (hn != "") {
-          data <- data %>% filter(hostname == hn)
+          data_filtred <- data_filtred %>% filter(hostname == hn)
         }
       }
+
+      # choice of columns
+      data <- data_filtred[, input$columns_current, drop = FALSE]
+
       return(data)
     } else {
       return(NULL)
@@ -174,6 +178,8 @@ server <- function(input, output, session) {
 
   output$df_all <- renderDT({
     data_used <- filtered_data()
+    # hostname with link
+    data_used$hostname <- sprintf("<a href='https://%s' target='_blank'>%s</a>", data_used$hostname, data_used$hostname)
     if (!is.null(data_used)) {
       datatable(data_used, escape = FALSE, selection = "single", options = list(scrollX = TRUE, dom = "frtip", pageLength = 10), class = "stripe hover", rownames = FALSE)
     } else {
@@ -194,43 +200,47 @@ server <- function(input, output, session) {
     datatable(info_user, options = list(searching = TRUE, pageLength = 10), class = "stripe hover", rownames = FALSE)
   })
 
-  observeEvent(input$df_all_rows_selected, {
-    row_selected <- filtered_data()[input$df_all_rows_selected, ]
-    cert_data <- ssl_all[ssl_all$ip == row_selected$ip & ssl_all$hostname == row_selected$hostname, ]
+  observeEvent(input$df_all_cell_clicked, {
+    if (!is.null(input$df_all_cell_clicked$value)) {
+      if (input$df_all_cell_clicked$col == 0) {
+        selected_row <- filtered_data()[input$df_all_cell_clicked$row, , drop = FALSE]
+        cert_data <- ssl_all[selected_row$ip == ssl_all$ip & selected_row$hostname == ssl_all$hostname, ]
 
-    output$subject_name <- renderTable({
-      cert_data$subject %>%
-        select(CN) %>%
-        rename("Common Name" = CN)
-    })
+        output$subject_name <- renderTable({
+          cert_data$subject %>%
+            select(CN) %>%
+            rename("Common Name" = CN)
+        })
 
-    output$issuer_name <- renderTable({
-      cert_data$issuer %>%
-        select(C, ST, L, O, CN) %>%
-        rename("Country" = C, "State/Province" = ST, "Locality" = L, "Organization" = O, "Common Name" = CN)
-    })
+        output$issuer_name <- renderTable({
+          cert_data$issuer %>%
+            select(C, ST, L, O, CN) %>%
+            rename("Country" = C, "State/Province" = ST, "Locality" = L, "Organization" = O, "Common Name" = CN)
+        })
 
-    output$validity <- renderUI({
-      cert_data %>%
-        select(date_debut, date_fin) %>%
-        rename("Not Before" = date_debut, "Not After" = date_fin) %>%
-        kable(format = "html", row.names = FALSE) %>%
-        kable_styling() %>%
-        HTML()
-    })
+        output$validity <- renderUI({
+          cert_data %>%
+            select(date_debut, date_fin) %>%
+            rename("Not Before" = date_debut, "Not After" = date_fin) %>%
+            kable(format = "html", row.names = FALSE) %>%
+            kable_styling() %>%
+            HTML()
+        })
 
-    output$subject_alt_names <- renderTable({
-      san <- cert_data %>% select(san)
-      as.data.frame(lapply(san, function(col) {
-        if (is.list(col)) {
-          sapply(col, paste, collapse = ", ")
-        } else {
-          col
-        }
-      })) %>% rename("DNS Name" = san)
-    })
+        output$subject_alt_names <- renderTable({
+          san <- cert_data %>% select(san)
+          as.data.frame(lapply(san, function(col) {
+            if (is.list(col)) {
+              sapply(col, paste, collapse = ", ")
+            } else {
+              col
+            }
+          })) %>% rename("DNS Name" = san)
+        })
 
-    showModal(modalDialog(title = "Informations du certificat", easyClose = TRUE, "Subject Name", tableOutput("subject_name"), tags$hr(style = "border-top: 1px solid #000;"), "Issuer Name", tableOutput("issuer_name"), tags$hr(style = "border-top: 1px solid #000;"), "Validity", uiOutput("validity"), tags$hr(style = "border-top: 1px solid #000;"), "Subject Alt Names", tableOutput("subject_alt_names"), footer = modalButton("Fermer")))
+        showModal(modalDialog(title = "Informations du certificat", easyClose = TRUE, "Subject Name", tableOutput("subject_name"), tags$hr(style = "border-top: 1px solid #000;"), "Issuer Name", tableOutput("issuer_name"), tags$hr(style = "border-top: 1px solid #000;"), "Validity", uiOutput("validity"), tags$hr(style = "border-top: 1px solid #000;"), "Subject Alt Names", tableOutput("subject_alt_names"), footer = modalButton("Fermer")))
+      }
+    }
   })
 }
 
