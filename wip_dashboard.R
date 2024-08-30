@@ -102,7 +102,9 @@ body <- dashboardBody(
               checkboxInput("hostname_filter", "Filtrer selon le hostname ?", FALSE),
               conditionalPanel(
                 condition = "input.hostname_filter == true", textInput("hostname", "Hostname d'un certificat :", value = "")
-              )
+              ),
+              hr(style = "border-color: black; border-width: 3px;"),
+              checkboxInput("no_resp_filter", "Afficher uniquement les certificats sans responsable ?", FALSE)
             )
           ),
           column(
@@ -165,6 +167,12 @@ server <- function(input, output, session) {
       if (hn != "") {
         data_filtred <- data_filtred %>% filter(hostname == hn)
       }
+    }
+
+    # filter to control certificates without responsible
+    if (input$no_resp_filter) {
+      ips_cmdb <- dbGetQuery(con_sqlite, "SELECT Server.ip FROM Server")
+      data_filtred <- ssl_all %>% filter(ip %ni% ips_cmdb$ip)
     }
 
     # choice of columns
