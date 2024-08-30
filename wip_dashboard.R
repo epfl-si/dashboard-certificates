@@ -178,29 +178,32 @@ server <- function(input, output, session) {
     # choice of columns
     data <- data_filtred[, input$columns_current, drop = FALSE]
 
-    # add column with ip
-    data$ip <- data_filtred$ip
-    data <- data %>% select(ip, everything())
+    if (nrow(data) > 0) {
+      # add column with ip
+      data$ip <- data_filtred$ip
+      data <- data %>% select(ip, everything())
 
-    # add column with hostname
-    data$hostname <- data_filtred$hostname
-    data <- data %>% select(hostname, everything())
+      # add column with hostname
+      data$hostname <- data_filtred$hostname
+      data <- data %>% select(hostname, everything())
 
-    # add column to display pop up with certificate information
-    data$info <- '<i class=\"fa fa-info-circle\"></i>'
-    data <- data %>% select(info, everything())
-
+      # add column to display pop up with certificate information
+      data$info <- '<i class=\"fa fa-info-circle\"></i>'
+      data <- data %>% select(info, everything())
+    } else {
+      data <- NULL
+    }
     return(data)
   })
 
   output$df_all <- renderDT({
     data_used <- filtered_data()
-    # hostname with link
-    data_used$hostname <- sprintf("<a href='https://%s' target='_blank'>%s</a>", data_used$hostname, data_used$hostname)
     if (!is.null(data_used)) {
+      # hostname with link
+      data_used$hostname <- sprintf("<a href='https://%s' target='_blank'>%s</a>", data_used$hostname, data_used$hostname)
       datatable(data_used, escape = FALSE, selection = "single", options = list(scrollX = TRUE, dom = "frtip", pageLength = 10), class = "stripe hover", rownames = FALSE)
     } else {
-      datatable(data.frame(Message = "Aucune colonne sélectionnée !"), selection = "single", options = list(dom = "rtip", pageLength = 10), class = "stripe hover", rownames = FALSE)
+      datatable(data.frame(Message = "Aucun certificat ne correspond..."), selection = "single", options = list(dom = "rt", pageLength = 10), class = "stripe hover", rownames = FALSE)
     }
   })
 
@@ -214,7 +217,11 @@ server <- function(input, output, session) {
       rename(nom = cn, rifs = rifs_flag, adminit = adminit_flag) %>%
       mutate(rifs = ifelse(rifs == 1, "x", ""), adminit = ifelse(adminit == 1, "x", "")) %>%
       arrange(nom)
-    datatable(info_user, options = list(searching = TRUE, pageLength = 10), class = "stripe hover", rownames = FALSE)
+    if(nrow(info_user) > 0) {
+      datatable(info_user, options = list(searching = TRUE, pageLength = 10), class = "stripe hover", rownames = FALSE)
+    } else {
+      datatable(data.frame(Message = "Aucun responsable assigné !"), selection = "single", options = list(dom = "rt", pageLength = 10), class = "stripe hover", rownames = FALSE)
+    }
   })
 
   observeEvent(input$df_all_cell_clicked, {
