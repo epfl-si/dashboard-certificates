@@ -43,4 +43,4 @@ services:
       - ./volumes/sqlite:/srv/cert_dashboard/sqlite
       - ./env-docker.R:/srv/cert_dashboard/R/env.R
     # FIXME : impossible de visualiser dashboard dans navigateur
-    command: Rscript /srv/cert_dashboard/R/new_dashboard.R
+    command: Rscript /srv/cert_dashboard/R/wip_dashboard.R

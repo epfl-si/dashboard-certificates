@@ -1,6 +1,14 @@
 # dashboard_certificates
 
-Création d'un dashboard pour visualiser ses propres certificats ayant une échéance à court terme.
+Le but de ce projet est de visualiser les dates d'échéances des certificats SSL ainsi que les personnes responsables dans le but d'anticiper le renouvellement des certificats.
+
+La commande principale `make up` permet de :
+- créer les volumes utilisés par docker
+- démarrer un container pour elasticsearch
+- copier les données dans un elasticsearch de dev
+- créer et alimenter un schéma dans SQLite
+- démarrer un container pour shiny
+- donner accès au dashboard
 
 ## Pré-requis
 
@@ -19,7 +27,7 @@ Création d'un dashboard pour visualiser ses propres certificats ayant une éch�
 
 ## TODO / FIXME
 
-- add_cmdb_data.R (voir FIXMEs) -> correspondance entre données de ssl et cmdb KO
 - fixer lancements des scripts R depuis Makefile (dans et hors docker)
-- dashboard -> finir tableau (pour l'instant ébauche de tableau avec toutes les données), créer page de détails et créer vues différentes en fonction du sciper / fonction du user
 - Makefile -> ne doit pas poser problème si même commande relancée plusieurs fois de suite (KO avec génération du token pour `make token`)
+- schéma UML de la base de données et de cmdb + ssl à la base
+- utiliser les namespaces dans le code R (`ns()`) pour délimiter influence des variables

@@ -17,7 +17,7 @@ library(tidyr)
 library(kableExtra)
 library(knitr)
 
-options(shiny.host = "0.0.0.0")
+options(shiny.host = shiny_host)
 options(shiny.port = 8180)
 
 # open connection with elasticsearch
@@ -31,12 +31,12 @@ ssl_data <- fromJSON(Search(con_elasticsearch, index = "ssl", size = 10000, raw 
   mutate(validFrom = as.Date(validFrom), validTo = as.Date(validTo)) %>%
   rename(ip = ipv4, date_debut = validFrom, date_fin = validTo)
 
-# tableau avec hostname, ip, date_debut et date_fin
+# clean ssl data (hostname, ip, date_debut et date_fin)
 ssl_specific <- ssl_data %>%
   select(hostname, ip, date_debut, date_fin) %>%
   arrange(hostname)
 
-# tableau avec tout de ssl
+# table with all ssl data
 # TODO : formater les donnees de ssl et de cmdb pour donner la possibilite d'afficher toutes les colonnes utiles dans tableau principal
 ssl_all <- ssl_data
 # FIXME : besoin des donnees de ces sous-tableaux pour afficher les details ?
@@ -45,7 +45,7 @@ issuer <- ssl_data$issuer
 proto <- ssl_data$proto
 # cmdb$iaas utile ?
 
-# noms des colonnes (sans ip et hostname car rajoutes plus tard)
+# selection of columns from ssl to display (sans ip et hostname car rajoutes plus tard)
 column_default <- c("date_debut", "date_fin")
 column_choices <- names(ssl_all)
 column_choices <- column_choices[column_choices != "ip" & column_choices != "hostname"]
@@ -60,8 +60,10 @@ convertMenuItem <- function(mi, tabName) {
   mi
 }
 
+# title + notifications
 header <- dashboardHeader(title = "Certificats SSL", dropdownMenuOutput("notifOutput"))
 
+# sidebar (column selection)
 sidebar <- dashboardSidebar(
   collapsed = TRUE,
   sidebarMenu(
@@ -76,6 +78,7 @@ sidebar <- dashboardSidebar(
   )
 )
 
+# body (filters (expired cert, period, resp, hostname and cert without resp) + tables (ssl, resp with roles and info cert))
 body <- dashboardBody(
   tabItems(
     tabItem(
@@ -125,6 +128,7 @@ body <- dashboardBody(
   )
 )
 
+# user interface
 ui <- dashboardPage(
   skin = "red",
   header,
@@ -132,12 +136,14 @@ ui <- dashboardPage(
   body
 )
 
+# server
 server <- function(input, output, session) {
   output$notifOutput <- renderMenu({
     notif <- notificationItem(text_notification, icon = icon("warning"))
     dropdownMenu(type = "notifications", notif)
   })
 
+  # function to filter ssl data
   filtered_data <- reactive({
     data_filtred <- ssl_all
 
@@ -169,7 +175,7 @@ server <- function(input, output, session) {
       }
     }
 
-    # filter to control certificates without responsible
+    # filter to control cert without resp
     if (input$no_resp_filter) {
       ips_cmdb <- dbGetQuery(con_sqlite, "SELECT Server.ip FROM Server")
       data_filtred <- ssl_all %>% filter(ip %ni% ips_cmdb$ip)
@@ -196,6 +202,7 @@ server <- function(input, output, session) {
     return(data)
   })
 
+  # main table with ssl data and selected columns
   output$df_all <- renderDT({
     data_used <- filtered_data()
     if (!is.null(data_used)) {
@@ -207,6 +214,7 @@ server <- function(input, output, session) {
     }
   })
 
+  # table of resp dependent on selected line in main table
   output$df_resp <- renderDT({
     req(input$df_all_rows_selected) # affichage uniquement si ligne selectionnee
     selected_row <- input$df_all_rows_selected # index de la ligne selectionnee
@@ -217,31 +225,35 @@ server <- function(input, output, session) {
       rename(nom = cn, rifs = rifs_flag, adminit = adminit_flag) %>%
       mutate(rifs = ifelse(rifs == 1, "x", ""), adminit = ifelse(adminit == 1, "x", "")) %>%
       arrange(nom)
-    if(nrow(info_user) > 0) {
+    if (nrow(info_user) > 0) {
       datatable(info_user, options = list(searching = TRUE, pageLength = 10), class = "stripe hover", rownames = FALSE)
     } else {
       datatable(data.frame(Message = "Aucun responsable assigné !"), selection = "single", options = list(dom = "rt", pageLength = 10), class = "stripe hover", rownames = FALSE)
     }
   })
 
+  # pop up when click on column "info" in main table to display cert info
   observeEvent(input$df_all_cell_clicked, {
     if (!is.null(input$df_all_cell_clicked$value)) {
       if (input$df_all_cell_clicked$col == 0) {
         selected_row <- filtered_data()[input$df_all_cell_clicked$row, , drop = FALSE]
         cert_data <- ssl_all[selected_row$ip == ssl_all$ip & selected_row$hostname == ssl_all$hostname, ]
 
+        # subject name
         output$subject_name <- renderTable({
           cert_data$subject %>%
             select(CN) %>%
             rename("Common Name" = CN)
         })
 
+        # issuer name
         output$issuer_name <- renderTable({
           cert_data$issuer %>%
             select(C, ST, L, O, CN) %>%
             rename("Country" = C, "State/Province" = ST, "Locality" = L, "Organization" = O, "Common Name" = CN)
         })
 
+        # validity
         output$validity <- renderUI({
           cert_data %>%
             select(date_debut, date_fin) %>%
@@ -251,6 +263,7 @@ server <- function(input, output, session) {
             HTML()
         })
 
+        # subject alt names
         output$subject_alt_names <- renderTable({
           san <- cert_data %>% select(san)
           as.data.frame(lapply(san, function(col) {

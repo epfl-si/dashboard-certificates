@@ -122,4 +122,4 @@ reformat_ssl_json:
 # FIXME : besoin de tester le dashboard en dehors du docker pendant dev ?
 # OK visualisation du dashboard ici mais pas via lancement dans docker, pourquoi ?
 test_dashboard:
-	Rscript new_dashboard.R
+	Rscript wip_dashboard.R
