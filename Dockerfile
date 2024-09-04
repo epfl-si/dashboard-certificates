@@ -12,5 +12,6 @@ RUN mkdir /srv/cert_dashboard/R
 WORKDIR /srv/cert_dashboard/R
 
 COPY *.R /srv/cert_dashboard/R/
+COPY shiny-server.conf /etc/shiny-server/shiny-server.conf
 
 RUN Rscript /srv/cert_dashboard/R/lib.R

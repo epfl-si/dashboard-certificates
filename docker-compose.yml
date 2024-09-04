@@ -33,7 +33,7 @@ services:
     build: .
     container_name: cert_dashboard
     ports:
-      - "127.0.0.1:8181:8180"
+      - "127.0.0.1:8183:8180"
     env_file:
       - .env
     depends_on:

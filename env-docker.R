@@ -9,4 +9,4 @@ host_elasticsearch <- "elasticsearch"
 port_elasticsearch <- 9200
 user_elasticsearch <- Sys.getenv("ELASTICSEARCH_USER")
 password_elasticsearch <- Sys.getenv("ELASTICSEARCH_PASSWORD")
-shiny_host <- "127.0.0.1"
+shiny_host <- "0.0.0.0"
