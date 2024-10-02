@@ -13,7 +13,6 @@ up: setup
 	$(MAKE) dashboard
 	@touch .env_started
 
-# FIXME : toujours necessaire ? si oui pourquoi ?
 setup:
 	@mkdir -p volumes/elastic/data volumes/elastic/logs volumes/shiny volumes/sqlite
 
@@ -51,17 +50,14 @@ data: .elasticsearch_started
 nosql_into_sql:
 	cp cmdb_schema.sqlite ./volumes/sqlite/cmdb.sqlite
 	@ echo "Install 'here' R package" && R -e "install.packages(\"here\")"
-# FIXME : comment voir l'execution du script ?
 	@ echo "Load data from elasticsearch into sqlite" && Rscript add_cmdb_data.R
 
 dashboard:
 	docker compose up -d cert_dashboard
 #docker compose logs -f cert_dashboard
-# FIXME : but est de lancer script dans Makefile ou dans docker avec docker compose ?
 
 .elasticsearch_started:
 	$(MAKE) elasticsearch
-# FIXME : generation du fichier que quand elasticsearch ready (boucle tant que pas fichier ?)
 	echo "Waiting for elasticsearch to be ready"; \
 	while [ "$$(curl -s -o /dev/null -w '%{http_code}' -u ${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD} -XGET "localhost:9200/")" != "200" ]; do \
 	sleep 5; \
@@ -72,9 +68,7 @@ dashboard:
 elasticsearch: vm-max_map_count
 	@docker compose up -d elasticsearch
 #docker compose logs -f elasticsearch
-# FIXME : fichier genere uniquement quand elasticsearch est dispo, pas avant
 
-# FIXME : toujours necessaire (lancement du container de elasticsearch ko sinon chez moi) ?
 vm-max_map_count:
 	@if [ "$$(uname)" = "Linux" ]; then \
 		sudo sysctl -w vm.max_map_count=262144 1>/dev/null && echo "vm.max_map_count changed"; \
@@ -120,6 +114,5 @@ reformat_ssl_json:
 	mv ./prod_to_dev/formated_ssl.json ./prod_to_dev/ssl.json
 
 # FIXME : besoin de tester le dashboard en dehors du docker pendant dev ?
-# OK visualisation du dashboard ici mais pas via lancement dans docker, pourquoi ?
 test_dashboard:
 	Rscript wip_dashboard.R

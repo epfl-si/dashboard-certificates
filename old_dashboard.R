@@ -2,13 +2,12 @@ library(here)
 here::i_am("lib.R")
 source(here("lib.R"))
 source(here("env.R"))
-source(here("clean_data.R"))
 
-# TODO : supprimer les librairies plus utilisees et mettre a jour fichier lib.R
 library(shiny)
 library(shinydashboard)
 library(shiny.fluent)
 library(DT)
+library(elastic)
 library(RSQLite)
 library(dplyr)
 library(jsonlite)
@@ -21,29 +20,32 @@ library(knitr)
 options(shiny.host = shiny_host)
 options(shiny.port = 8180)
 
+# open connection with elasticsearch
+con_elasticsearch <- connect(host = host_elasticsearch, user = user_elasticsearch, pwd = password_elasticsearch, port = port_elasticsearch, transport_schema = "http")
 # open connection with sqlite
 con_sqlite <- dbConnect(RSQLite::SQLite(), db_path)
 
 # import ssl data from elasticsearch
-ssl_data <- ssl_data %>%
+ssl_data <- fromJSON(Search(con_elasticsearch, index = "ssl", size = 10000, raw = TRUE))$hits$hits$"_source" %>%
   mutate(ipv4 = as.character(ipv4)) %>%
   mutate(validFrom = as.Date(validFrom), validTo = as.Date(validTo)) %>%
   rename(ip = ipv4, date_debut = validFrom, date_fin = validTo)
 
-# clean ssl data (san, hostname, ip, date_debut et date_fin)
+# clean ssl data (hostname, ip, date_debut et date_fin)
 ssl_specific <- ssl_data %>%
-  select(san, hostname, ip, date_debut, date_fin) %>%
+  select(hostname, ip, date_debut, date_fin) %>%
   arrange(hostname)
 
 # table with all ssl data
 ssl_all <- ssl_data
 
-# TODO : choisir colonnes dans cmdb et ssl selon selection de Patrick
-# selection of columns from ssl to display (sans ip, hostname et san car rajoutes plus tard)
+# selection of columns from ssl to display (sans ip et hostname car rajoutes plus tard)
 column_default <- c("date_debut", "date_fin")
 column_choices <- names(ssl_all)
-# FIXME : comment enlever le hostname sans casser la recherche pour pop up avec info du certificat ?
-column_choices <- column_choices[column_choices != "ip" & column_choices != "hostname" & column_choices != "san"]
+column_choices <- column_choices[column_choices != "ip" & column_choices != "hostname"]
+
+# notification
+text_notification <- "..."
 
 # necessaire si filtre dans menu sinon erreur
 convertMenuItem <- function(mi, tabName) {
@@ -52,8 +54,8 @@ convertMenuItem <- function(mi, tabName) {
   mi
 }
 
-# title
-header <- dashboardHeader(title = "Certificats SSL")
+# title + notifications
+header <- dashboardHeader(title = "Certificats SSL", dropdownMenuOutput("notifOutput"))
 
 # sidebar (column selection)
 sidebar <- dashboardSidebar(
@@ -70,7 +72,7 @@ sidebar <- dashboardSidebar(
   )
 )
 
-# body (filters (expired cert and period) + table)
+# body (filters (expired cert, period, resp, hostname and cert without resp) + tables (ssl, resp with roles and info cert))
 body <- dashboardBody(
   tabItems(
     tabItem(
@@ -87,7 +89,19 @@ body <- dashboardBody(
               checkboxInput("periode_filter", "Filtrer selon la période ?", FALSE),
               conditionalPanel(
                 condition = "input.periode_filter == true", dateRangeInput("date_fin_plage", label = "Période comprenant la date d'échéance :", start = Sys.Date(), end = Sys.Date(), separator = " à ", format = "yyyy-mm-dd")
-              )
+              ),
+              hr(style = "border-color: black;"),
+              checkboxInput("resp_filter", "Filtrer selon le responsable ?", FALSE),
+              conditionalPanel(
+                condition = "input.resp_filter == true", textInput("sciper", "Sciper d'un responsable :", value = "")
+              ),
+              hr(style = "border-color: black;"),
+              checkboxInput("hostname_filter", "Filtrer selon le hostname ?", FALSE),
+              conditionalPanel(
+                condition = "input.hostname_filter == true", textInput("hostname", "Hostname d'un certificat :", value = "")
+              ),
+              hr(style = "border-color: black; border-width: 3px;"),
+              checkboxInput("no_resp_filter", "Afficher uniquement les certificats sans responsable ?", FALSE)
             )
           ),
           column(
@@ -95,6 +109,13 @@ body <- dashboardBody(
             h4(strong("Affichage des échéances des certificats :"), style = "text-align: center;"),
             DTOutput("df_all")
           )
+        ),
+        fluidRow(
+          hr(style = "border-color: black;"),
+          conditionalPanel(
+            condition = "input.df_all_rows_selected.length > 0", h4(strong("Affichage des responsables du certificat sélectionné :"), style = "text-align: center;")
+          ),
+          DTOutput("df_resp")
         )
       )
     )
@@ -111,6 +132,10 @@ ui <- dashboardPage(
 
 # server
 server <- function(input, output, session) {
+  output$notifOutput <- renderMenu({
+    notif <- notificationItem(text_notification, icon = icon("warning"))
+    dropdownMenu(type = "notifications", notif)
+  })
 
   # function to filter ssl data
   filtered_data <- reactive({
@@ -126,6 +151,30 @@ server <- function(input, output, session) {
       data_filtred <- data_filtred %>% filter(date_fin >= date_fin_min & date_fin <= date_fin_max)
     }
 
+    # sciper
+    if (input$resp_filter) {
+      sciper <- input$sciper
+      if (grepl("^[0-9]*$", sciper) && sciper != "") {
+        sciper <- as.integer(sciper)
+        ips <- dbGetQuery(con_sqlite, sprintf("SELECT User.id_user, User.sciper, Server.id_ip, Server.ip FROM User LEFT JOIN Server_User ON User.id_user = Server_User.id_user LEFT JOIN Server ON Server_User.id_ip = Server.id_ip WHERE sciper = %s;", sciper))
+        data_filtred <- data_filtred %>% filter(ip %in% ips$ip)
+      }
+    }
+
+    # hostname
+    if (input$hostname_filter) {
+      hn <- input$hostname
+      if (hn != "") {
+        data_filtred <- data_filtred %>% filter(hostname == hn)
+      }
+    }
+
+    # filter to control cert without resp
+    if (input$no_resp_filter) {
+      ips_cmdb <- dbGetQuery(con_sqlite, "SELECT Server.ip FROM Server")
+      data_filtred <- ssl_all %>% filter(ip %ni% ips_cmdb$ip)
+    }
+
     # choice of columns
     data <- data_filtred[, input$columns_current, drop = FALSE]
 
@@ -138,10 +187,6 @@ server <- function(input, output, session) {
       data$hostname <- data_filtred$hostname
       data <- data %>% select(hostname, everything())
 
-      # add column with san
-      data$san <- data_filtred$san
-      data <- data %>% select(san, everything())
-
       # add column to display pop up with certificate information
       data$info <- '<i class=\"fa fa-info-circle\"></i>'
       data <- data %>% select(info, everything())
@@ -151,13 +196,33 @@ server <- function(input, output, session) {
     return(data)
   })
 
-  # main table with data and selected columns
+  # main table with ssl data and selected columns
   output$df_all <- renderDT({
     data_used <- filtered_data()
     if (!is.null(data_used)) {
+      # hostname with link
+      data_used$hostname <- sprintf("<a href='https://%s' target='_blank'>%s</a>", data_used$hostname, data_used$hostname)
       datatable(data_used, escape = FALSE, selection = "single", options = list(scrollX = TRUE, dom = "frtip", pageLength = 10), class = "stripe hover", rownames = FALSE)
     } else {
       datatable(data.frame(Message = "Aucun certificat ne correspond..."), selection = "single", options = list(dom = "rt", pageLength = 10), class = "stripe hover", rownames = FALSE)
+    }
+  })
+
+  # table of resp dependent on selected line in main table
+  output$df_resp <- renderDT({
+    req(input$df_all_rows_selected) # affichage uniquement si ligne selectionnee
+    selected_row <- input$df_all_rows_selected # index de la ligne selectionnee
+    selected_data <- filtered_data()[selected_row, , drop = FALSE]
+    ip <- selected_data$ip
+    info_user <- dbGetQuery(con_sqlite, sprintf("SELECT sciper, cn, email, rifs_flag, adminit_flag FROM Server LEFT JOIN Server_User ON Server.id_ip = Server_User.id_ip LEFT JOIN User ON Server_User.id_user = User.id_user WHERE Server.ip = '%s';", ip))
+    info_user <- info_user %>%
+      rename(nom = cn, rifs = rifs_flag, adminit = adminit_flag) %>%
+      mutate(rifs = ifelse(rifs == 1, "x", ""), adminit = ifelse(adminit == 1, "x", "")) %>%
+      arrange(nom)
+    if (nrow(info_user) > 0) {
+      datatable(info_user, options = list(searching = TRUE, pageLength = 10), class = "stripe hover", rownames = FALSE)
+    } else {
+      datatable(data.frame(Message = "Aucun responsable assigné !"), selection = "single", options = list(dom = "rt", pageLength = 10), class = "stripe hover", rownames = FALSE)
     }
   })
 
@@ -178,8 +243,8 @@ server <- function(input, output, session) {
         # issuer name
         output$issuer_name <- renderTable({
           cert_data$issuer %>%
-            select(C, O, CN) %>%
-            rename("Country" = C, "Organization" = O, "Common Name" = CN)
+            select(C, ST, L, O, CN) %>%
+            rename("Country" = C, "State/Province" = ST, "Locality" = L, "Organization" = O, "Common Name" = CN)
         })
 
         # validity
@@ -211,18 +276,3 @@ server <- function(input, output, session) {
 }
 
 shinyApp(ui, server)
-
-# cert_titles <- c("Public Key Info", "Miscellaneous", "Fingerprints", "Basic Constraints", "Key Usages", "Extended Key Usages", "Subject Key ID", "Authority Key ID", "Authority Info (AIA)", "Certificate Policies", "Embedded STCs")
-
-# FIXME : quelles infos pour parties ci-dessous ?
-# public key info
-# miscellaneous
-# fingerprints
-# basic constraints
-# key usages
-# extended key usages
-# subject key id
-# authority key id
-# authority info (AIA)
-# certificate policies
-# embedded STCs
