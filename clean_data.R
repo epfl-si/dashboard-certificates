@@ -4,7 +4,7 @@ source(here("lib.R"))
 source(here("env.R"))
 
 library(elastic)
-library(dlyr)
+library(dplyr)
 library(jsonlite)
 
 # open connection with elasticsearch
