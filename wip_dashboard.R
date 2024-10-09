@@ -17,6 +17,8 @@ library(log4r)
 library(tidyr)
 library(kableExtra)
 library(knitr)
+library(ggplot2)
+library(plyr)
 
 options(shiny.host = shiny_host)
 options(shiny.port = 8180)
@@ -95,6 +97,9 @@ body <- dashboardBody(
             h4(strong("Affichage des échéances des certificats :"), style = "text-align: center;"),
             DTOutput("df_all")
           )
+        ),
+        fluidRow(
+          plotOutput("plot", height = "300px")
         )
       )
     )
@@ -208,21 +213,43 @@ server <- function(input, output, session) {
       }
     }
   })
+
+  output$plot<- renderPlot({
+    data_due_date <- data %>%
+    mutate(cat_exp = case_when(
+      validTo < Sys.Date() - 7 ~ "Expirés",
+      validTo < Sys.Date() ~ "Récemment expirés",
+      validTo < Sys.Date() + 30 ~ "0-30 jours",
+      validTo < Sys.Date() + 60 ~ "31-60 jours",
+      validTo < Sys.Date() + 90 ~ "61-90 jours",
+      TRUE ~ "> 91 jours"
+    ))
+
+    max_count <- data_due_date %>% dplyr::count(cat_exp) %>% summarise(max_count = max(n)) %>% pull(max_count)
+    max_count_round <- round_any(max_count, 100, f = ceiling)
+
+    ggplot(data = data_due_date, aes(x = factor(cat_exp, levels = c("Expirés", "Récemment expirés", "0-30 jours", "31-60 jours", "61-90 jours", "> 91 jours")), fill = factor(cat_exp, levels = c("Expirés", "Récemment expirés", "0-30 jours", "31-60 jours", "61-90 jours", "> 91 jours")))) + 
+        geom_hline(yintercept = seq(0, max_count_round, by = 50), linetype = "solid", linewidth = 0.5, color = "lightgrey") + 
+        geom_bar(show.legend = FALSE) + 
+        scale_fill_manual(values = c("black", "red", "orange", "yellow", "green", "blue")) + 
+        labs(
+          title = "Echéances des certificats", 
+          x = "Jours jusqu'à échéance", 
+          y = "Certificats"
+        ) + 
+        theme(
+          plot.title = element_text(hjust = 0.5, size = 20, margin = margin(b = -20)),
+          axis.title.x = element_text(size = 16, margin = margin(t = 20)),
+          axis.text.x = element_text(size = 16, margin = margin(t = -30)),
+          axis.title.y = element_text(size = 16, margin = margin(r = 20)),
+          axis.text.y = element_text(size = 16, margin = margin(r = 5)),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.background = element_blank()
+        ) + 
+        geom_text(stat = 'count', aes(label = after_stat(count)), vjust = -0.5, size = 6) + 
+        scale_y_continuous(limits = c(0, max_count_round), breaks = seq(0, max_count_round, by = 50))
+  })
 }
 
 shinyApp(ui, server)
-
-# cert_titles <- c("Public Key Info", "Miscellaneous", "Fingerprints", "Basic Constraints", "Key Usages", "Extended Key Usages", "Subject Key ID", "Authority Key ID", "Authority Info (AIA)", "Certificate Policies", "Embedded STCs")
-
-# FIXME : quelles infos pour parties ci-dessous ?
-# public key info
-# miscellaneous
-# fingerprints
-# basic constraints
-# key usages
-# extended key usages
-# subject key id
-# authority key id
-# authority info (AIA)
-# certificate policies
-# embedded STCs
