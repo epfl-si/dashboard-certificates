@@ -1,7 +1,7 @@
 library(here)
 here::i_am("lib.R")
-source(here("lib.R"))
-source(here("env.R"))
+source(here::here("lib.R"))
+source(here::here("env.R"))
 
 library(shiny)
 library(shinydashboard)

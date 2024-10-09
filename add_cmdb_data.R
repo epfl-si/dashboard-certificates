@@ -1,8 +1,8 @@
 library(here)
 here::i_am("lib.R")
-source(here("lib.R"))
-source(here("env.R"))
-source(here("clean_data.R"))
+source(here::here("lib.R"))
+source(here::here("env.R"))
+source(here::here("clean_data.R"))
 
 library(RSQLite)
 library(jsonlite)

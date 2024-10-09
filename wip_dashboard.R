@@ -1,8 +1,8 @@
 library(here)
 here::i_am("lib.R")
-source(here("lib.R"))
-source(here("env.R"))
-source(here("clean_data.R"))
+source(here::here("lib.R"))
+source(here::here("env.R"))
+source(here::here("clean_data.R"))
 
 # TODO : supprimer les librairies plus utilisees et mettre a jour fichier lib.R
 library(shiny)
@@ -30,7 +30,7 @@ con_sqlite <- dbConnect(RSQLite::SQLite(), db_path)
 ssl_data <- ssl_data %>%
   mutate(ipv4 = as.character(ipv4)) %>%
   mutate(validFrom = as.Date(validFrom), validTo = as.Date(validTo)) %>%
-  rename(ip = ipv4, date_debut = validFrom, date_fin = validTo)
+  dplyr::rename(ip = ipv4, date_debut = validFrom, date_fin = validTo)
 
 # clean ssl data (san, hostname, ip, date_debut et date_fin)
 ssl_specific <- ssl_data %>%
@@ -99,7 +99,7 @@ body <- dashboardBody(
           )
         ),
         fluidRow(
-          plotOutput("plot", height = "300px")
+          plotOutput("plot")
         )
       )
     )
@@ -215,13 +215,13 @@ server <- function(input, output, session) {
   })
 
   output$plot<- renderPlot({
-    data_due_date <- data %>%
+    data_due_date <- ssl_all %>%
     mutate(cat_exp = case_when(
-      validTo < Sys.Date() - 7 ~ "Expirés",
-      validTo < Sys.Date() ~ "Récemment expirés",
-      validTo < Sys.Date() + 30 ~ "0-30 jours",
-      validTo < Sys.Date() + 60 ~ "31-60 jours",
-      validTo < Sys.Date() + 90 ~ "61-90 jours",
+      date_fin < Sys.Date() - 7 ~ "Expirés",
+      date_fin < Sys.Date() ~ "Récemment expirés",
+      date_fin < Sys.Date() + 30 ~ "0-30 jours",
+      date_fin < Sys.Date() + 60 ~ "31-60 jours",
+      date_fin < Sys.Date() + 90 ~ "61-90 jours",
       TRUE ~ "> 91 jours"
     ))
 
@@ -238,9 +238,9 @@ server <- function(input, output, session) {
           y = "Certificats"
         ) + 
         theme(
-          plot.title = element_text(hjust = 0.5, size = 20, margin = margin(b = -20)),
+          plot.title = element_text(hjust = 0.5, size = 20, margin = margin(b = 10)),
           axis.title.x = element_text(size = 16, margin = margin(t = 20)),
-          axis.text.x = element_text(size = 16, margin = margin(t = -30)),
+          axis.text.x = element_text(size = 16, margin = margin(t = 0)),
           axis.title.y = element_text(size = 16, margin = margin(r = 20)),
           axis.text.y = element_text(size = 16, margin = margin(r = 5)),
           panel.grid.major = element_blank(),
