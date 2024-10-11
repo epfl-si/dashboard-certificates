@@ -95,7 +95,8 @@ body <- dashboardBody(
           column(
             width = 9,
             h4(strong("Affichage des échéances des certificats :"), style = "text-align: center;"),
-            DTOutput("df_all")
+            DTOutput("df_all"),
+            downloadButton("download_data", "Téléchargement des données au format csv")
           )
         ),
         fluidRow(
@@ -116,7 +117,6 @@ ui <- dashboardPage(
 
 # server
 server <- function(input, output, session) {
-
   # function to filter ssl data
   filtered_data <- reactive({
     data_filtred <- ssl_all
@@ -166,6 +166,14 @@ server <- function(input, output, session) {
     }
   })
 
+  output$download_data <- downloadHandler(
+    filename = "data.csv", content = function(file) {
+      data <- filtered_data()
+      data <- data %>% select(-info)
+      write.csv(data, file, row.names = FALSE)
+    }
+  )
+
   # pop up when click on column "info" in main table to display cert info
   observeEvent(input$df_all_cell_clicked, {
     if (!is.null(input$df_all_cell_clicked$value)) {
@@ -214,41 +222,44 @@ server <- function(input, output, session) {
     }
   })
 
-  output$plot<- renderPlot({
+  output$plot <- renderPlot({
     data_due_date <- ssl_all %>%
-    mutate(cat_exp = case_when(
-      date_fin < Sys.Date() - 7 ~ "Expirés",
-      date_fin < Sys.Date() ~ "Récemment expirés",
-      date_fin < Sys.Date() + 30 ~ "0-30 jours",
-      date_fin < Sys.Date() + 60 ~ "31-60 jours",
-      date_fin < Sys.Date() + 90 ~ "61-90 jours",
-      TRUE ~ "> 91 jours"
-    ))
+      mutate(cat_exp = case_when(
+        date_fin < Sys.Date() - 7 ~ "Expirés",
+        date_fin < Sys.Date() ~ "Récemment expirés",
+        date_fin < Sys.Date() + 30 ~ "0-30 jours",
+        date_fin < Sys.Date() + 60 ~ "31-60 jours",
+        date_fin < Sys.Date() + 90 ~ "61-90 jours",
+        TRUE ~ "> 91 jours"
+      ))
 
-    max_count <- data_due_date %>% dplyr::count(cat_exp) %>% summarise(max_count = max(n)) %>% pull(max_count)
+    max_count <- data_due_date %>%
+      dplyr::count(cat_exp) %>%
+      summarise(max_count = max(n)) %>%
+      pull(max_count)
     max_count_round <- round_any(max_count, 100, f = ceiling)
 
-    ggplot(data = data_due_date, aes(x = factor(cat_exp, levels = c("Expirés", "Récemment expirés", "0-30 jours", "31-60 jours", "61-90 jours", "> 91 jours")), fill = factor(cat_exp, levels = c("Expirés", "Récemment expirés", "0-30 jours", "31-60 jours", "61-90 jours", "> 91 jours")))) + 
-        geom_hline(yintercept = seq(0, max_count_round, by = 50), linetype = "solid", linewidth = 0.5, color = "lightgrey") + 
-        geom_bar(show.legend = FALSE) + 
-        scale_fill_manual(values = c("black", "red", "orange", "yellow", "green", "blue")) + 
-        labs(
-          title = "Echéances des certificats", 
-          x = "Jours jusqu'à échéance", 
-          y = "Certificats"
-        ) + 
-        theme(
-          plot.title = element_text(hjust = 0.5, size = 20, margin = margin(b = 10)),
-          axis.title.x = element_text(size = 16, margin = margin(t = 20)),
-          axis.text.x = element_text(size = 16, margin = margin(t = 0)),
-          axis.title.y = element_text(size = 16, margin = margin(r = 20)),
-          axis.text.y = element_text(size = 16, margin = margin(r = 5)),
-          panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank(),
-          panel.background = element_blank()
-        ) + 
-        geom_text(stat = 'count', aes(label = after_stat(count)), vjust = -0.5, size = 6) + 
-        scale_y_continuous(limits = c(0, max_count_round), breaks = seq(0, max_count_round, by = 50))
+    ggplot(data = data_due_date, aes(x = factor(cat_exp, levels = c("Expirés", "Récemment expirés", "0-30 jours", "31-60 jours", "61-90 jours", "> 91 jours")), fill = factor(cat_exp, levels = c("Expirés", "Récemment expirés", "0-30 jours", "31-60 jours", "61-90 jours", "> 91 jours")))) +
+      geom_hline(yintercept = seq(0, max_count_round, by = 50), linetype = "solid", linewidth = 0.5, color = "lightgrey") +
+      geom_bar(show.legend = FALSE) +
+      scale_fill_manual(values = c("black", "red", "orange", "yellow", "green", "blue")) +
+      labs(
+        title = "Echéances des certificats",
+        x = "Jours jusqu'à échéance",
+        y = "Certificats"
+      ) +
+      theme(
+        plot.title = element_text(hjust = 0.5, size = 20, margin = margin(b = 10)),
+        axis.title.x = element_text(size = 16, margin = margin(t = 20)),
+        axis.text.x = element_text(size = 16, margin = margin(t = 0)),
+        axis.title.y = element_text(size = 16, margin = margin(r = 20)),
+        axis.text.y = element_text(size = 16, margin = margin(r = 5)),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank()
+      ) +
+      geom_text(stat = "count", aes(label = after_stat(count)), vjust = -0.5, size = 6) +
+      scale_y_continuous(limits = c(0, max_count_round), breaks = seq(0, max_count_round, by = 50))
   })
 }
 

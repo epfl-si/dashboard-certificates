@@ -28,3 +28,6 @@ ssl_data <- ssl_data %>% filter(ipv4 %in% cmdb_data$ip)
 
 # filter cmdb data if ips not in ssl data
 cmdb_data <- cmdb_data %>% filter(ip %in% ssl_data$ipv4)
+
+# cast list to character
+ssl_data <- ssl_data %>% mutate(ipv4 = as.character(ipv4), san = sapply(san, paste, collapse = ", "), ciphers = sapply(ciphers, paste, collapse = ", "), technologies = sapply(technologies, paste, collapse = ", "))
