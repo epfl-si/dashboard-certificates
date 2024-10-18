@@ -21,6 +21,17 @@ con_sqlite <- dbConnect(RSQLite::SQLite(), db_path)
 # ssl with all columns
 ssl_all <- ssl_data
 
+# ssl with due date
+ssl_due_date <- ssl_all %>%
+  mutate(cat_exp = case_when(
+    date_fin < Sys.Date() - 7 ~ "Expirés",
+    date_fin < Sys.Date() ~ "Récemment expirés",
+    date_fin < Sys.Date() + 30 ~ "0-30 jours",
+    date_fin < Sys.Date() + 60 ~ "31-60 jours",
+    date_fin < Sys.Date() + 90 ~ "61-90 jours",
+    TRUE ~ "> 91 jours"
+  ))
+
 # necessaire si filtre dans menu sinon erreur
 convertMenuItem <- function(mi, tabName) {
   mi$children[[1]]$attribs["data-toggle"] <- "tab"
@@ -39,6 +50,7 @@ sidebar <- dashboardSidebar(
       menuItem("Filtres",
         tabName = "table",
         icon = icon("list"),
+        # TODO : reinitialiser filtre si page rechargee ou case decochee
         checkboxInput("category_filter", "Filtrer selon la catégorie ?", value = FALSE),
         conditionalPanel(
           condition = "input.category_filter == true",
@@ -47,12 +59,12 @@ sidebar <- dashboardSidebar(
           checkboxInput("expired_before_30_days", "0-30 jours", value = FALSE),
           checkboxInput("expired_before_60_days", "31-60 jours", value = FALSE),
           checkboxInput("expired_before_90_days", "61-90 jours", value = FALSE),
-          checkboxInput("expired_after_90_days", "> 90 jours", value = FALSE)
+          checkboxInput("expired_after_90_days", "> 91 jours", value = FALSE)
         ),
         hr(style = "border-color: black;"),
-        checkboxInput("period_filter", "Filtrer selon la période ?", FALSE),
+        checkboxInput("period_filter", "Filtrer selon la période ?", value = FALSE),
         conditionalPanel(
-          # TODO : periode uniquement comprise selon categorie
+          # TODO : reinitialiser filtre si page rechargee ou case decochee
           condition = "input.period_filter == true", dateRangeInput("date_fin_plage", label = "Période comprenant la date d'échéance :", start = Sys.Date(), end = Sys.Date(), separator = " à ", format = "yyyy-mm-dd")
         ),
         hr(style = "border-color: black;")
@@ -91,68 +103,89 @@ ui <- dashboardPage(
 
 # server
 server <- function(input, output, session) {
-
   # update checkbox depending on other checkbox
-  observeEvent(input$period_filter, {
-    if (input$period_filter) {
-      updateCheckboxInput(session, "category_filter", value = FALSE)
-    }
-  })
   observeEvent(input$category_filter, {
     if (input$category_filter) {
       updateCheckboxInput(session, "period_filter", value = FALSE)
     }
   })
+  observeEvent(input$period_filter, {
+    if (input$period_filter) {
+      updateCheckboxInput(session, "category_filter", value = FALSE)
+    }
+  })
 
   # function to filter ssl data
   filtered_data <- reactive({
-    data <- ssl_all
-
-    # TODO : filtrer les donnees
-    #if (input$category_filter) {
-#
-    #}
-#
-    ## FIXME : else if ou if ?
-    #if (input$period_filter) {
-#
-    #}
-
-    # time
-    #date_fin_min <- input$date_fin_plage[1]
-    #date_fin_max <- input$date_fin_plage[2]
-    #if (input$period_filter && date_fin_min <= date_fin_max) {
-    #  data <- data %>% filter(date_fin >= date_fin_min & date_fin <= date_fin_max)
-    #}
-
-    if (nrow(data) > 0) {
+    data <- ssl_due_date
+    if (input$category_filter || input$period_filter) {
+      if (input$category_filter) {
+        data_temp <- data.frame()
+        is_filtered <- FALSE
+        if (input$expired) {
+          data_filtred <- data %>% dplyr::filter(cat_exp == "Expirés")
+          data_temp <- rbind(data_temp, data_filtred)
+          is_filtered <- TRUE
+        }
+        if (input$recently_expired) {
+          data_filtred <- data %>% dplyr::filter(cat_exp == "Récemment expirés")
+          data_temp <- rbind(data_temp, data_filtred)
+          is_filtered <- TRUE
+        }
+        if (input$expired_before_30_days) {
+          data_filtred <- data %>% dplyr::filter(cat_exp == "0-30 jours")
+          data_temp <- rbind(data_temp, data_filtred)
+          is_filtered <- TRUE
+        }
+        if (input$expired_before_60_days) {
+          data_filtred <- data %>% dplyr::filter(cat_exp == "31-60 jours")
+          data_temp <- rbind(data_temp, data_filtred)
+          is_filtered <- TRUE
+        }
+        if (input$expired_before_90_days) {
+          data_filtred <- data %>% dplyr::filter(cat_exp == "61-90 jours")
+          data_temp <- rbind(data_temp, data_filtred)
+          is_filtered <- TRUE
+        }
+        if (input$expired_after_90_days) {
+          data_filtred <- data %>% dplyr::filter(cat_exp == "> 91 jours")
+          data_temp <- rbind(data_temp, data_filtred)
+          is_filtered <- TRUE
+        }
+        if (!is_filtered) {
+          data <- ssl_all
+        } else {
+          data <- data_temp
+        }
+      } else { # input$period_filter == TRUE
+        date_fin_min <- input$date_fin_plage[1]
+        date_fin_max <- input$date_fin_plage[2]
+        if (date_fin_min <= date_fin_max) {
+          data <- data %>% filter(date_fin >= date_fin_min & date_fin <= date_fin_max)
+        } else {
+          data <- data.frame(Message = "Dates sélectionnées invalides !")
+        }
+      }
+    }
+    if (any(grepl("date_fin", colnames(data))) && nrow(data) > 0) {
       # add column to display pop up with certificate information
       data <- data %>% mutate(info = '<i class=\"fa fa-info-circle\"></i>')
-    } else {
-      data <- NULL
+    } else if (nrow(data) == 0) {
+      data <- data.frame(Message = "Aucun certificat ne correspond...")
     }
     return(data)
   })
 
   # plot depending on due date
   output$plot <- renderPlot({
-    data_due_date <- ssl_all %>%
-      mutate(cat_exp = case_when(
-        date_fin < Sys.Date() - 7 ~ "Expirés",
-        date_fin < Sys.Date() ~ "Récemment expirés",
-        date_fin < Sys.Date() + 30 ~ "0-30 jours",
-        date_fin < Sys.Date() + 60 ~ "31-60 jours",
-        date_fin < Sys.Date() + 90 ~ "61-90 jours",
-        TRUE ~ "> 91 jours"
-      ))
-
-    max_count <- data_due_date %>%
+    max_count <- ssl_due_date %>%
       dplyr::count(cat_exp) %>%
       summarise(max_count = max(n)) %>%
       pull(max_count)
     max_count_round <- round_any(max_count, 100, f = ceiling)
+    max_count_round_with_margin <- max_count_round + 100
 
-    ggplot(data = data_due_date, aes(x = factor(cat_exp, levels = c("Expirés", "Récemment expirés", "0-30 jours", "31-60 jours", "61-90 jours", "> 91 jours")), fill = factor(cat_exp, levels = c("Expirés", "Récemment expirés", "0-30 jours", "31-60 jours", "61-90 jours", "> 91 jours")))) +
+    ggplot(data = ssl_due_date, aes(x = factor(cat_exp, levels = c("Expirés", "Récemment expirés", "0-30 jours", "31-60 jours", "61-90 jours", "> 91 jours")), fill = factor(cat_exp, levels = c("Expirés", "Récemment expirés", "0-30 jours", "31-60 jours", "61-90 jours", "> 91 jours")))) +
       geom_hline(yintercept = seq(0, max_count_round, by = 50), linetype = "solid", linewidth = 0.5, color = "lightgrey") +
       geom_bar(show.legend = FALSE) +
       scale_fill_manual(values = c("black", "red", "orange", "yellow", "green", "blue")) +
@@ -162,7 +195,7 @@ server <- function(input, output, session) {
         y = ""
       ) +
       theme(
-        plot.title = element_text(hjust = 0.5, size = 20, margin = margin(b = 10)),
+        plot.title = element_text(hjust = 0.5, size = 20, margin = margin(b = 7)),
         axis.title.x = element_text(size = 16, margin = margin(t = 20)),
         axis.text.x = element_text(size = 16, margin = margin(t = 0)),
         axis.title.y = element_text(size = 16, margin = margin(r = 20)),
@@ -172,17 +205,17 @@ server <- function(input, output, session) {
         panel.background = element_blank()
       ) +
       geom_text(stat = "count", aes(label = after_stat(count)), vjust = -0.5, size = 6) +
-      scale_y_continuous(limits = c(0, max_count_round), breaks = seq(0, max_count_round, by = 50))
+      scale_y_continuous(limits = c(0, max_count_round_with_margin), breaks = seq(0, max_count_round, by = 50))
   })
 
   # table with selected data
   output$df <- renderDT({
     data_used <- filtered_data()
-    if (!is.null(data_used)) {
+    if (any(grepl("Message", colnames(data_used)))) {
+      datatable(data_used, selection = "single", options = list(dom = "rt", pageLength = 10), class = "stripe hover", rownames = FALSE)
+    } else {
       data_used <- data_used %>% select(info, date_fin, ip, hostname, san)
       datatable(data_used, escape = FALSE, selection = "single", options = list(scrollX = TRUE, dom = "frtip", pageLength = 10), class = "stripe hover", rownames = FALSE)
-    } else {
-      datatable(data.frame(Message = "Aucun certificat ne correspond..."), selection = "single", options = list(dom = "rt", pageLength = 10), class = "stripe hover", rownames = FALSE)
     }
   })
 
