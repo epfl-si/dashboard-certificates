@@ -39,22 +39,21 @@ sidebar <- dashboardSidebar(
       menuItem("Filtres",
         tabName = "table",
         icon = icon("list"),
-        checkboxInput("expired_filter", "Afficher les certificats échus ?", TRUE),
-
-        # TODO / FIXME : en attente de reponse
-        # h4(("Afficher les certificats...")),
-        # checkboxInput("echus", "Expirés", FALSE),
-        # checkboxInput("echus", "Récemment expirés", FALSE),
-        # checkboxInput("echus", "0-30 jours", FALSE),
-        # checkboxInput("echus", "31-60 jours", FALSE),
-        # checkboxInput("echus", "61-90 jours", FALSE),
-        # checkboxInput("echus", "> 90 jours", FALSE),
-        # FIXME / TODO : periode reprend filtre selon categorie puis filtrer plus precis avec filtre sur periode mais pas possible de filtrer moins precis ou sinon casse premier filtre sur categorie
-
-        hr(style = "border-color: black;"),
-        checkboxInput("periode_filter", "Filtrer selon la période ?", FALSE),
+        checkboxInput("category_filter", "Filtrer selon la catégorie ?", value = FALSE),
         conditionalPanel(
-          condition = "input.periode_filter == true", dateRangeInput("date_fin_plage", label = "Période comprenant la date d'échéance :", start = Sys.Date(), end = Sys.Date(), separator = " à ", format = "yyyy-mm-dd")
+          condition = "input.category_filter == true",
+          checkboxInput("expired", "Expirés", value = FALSE),
+          checkboxInput("recently_expired", "Récemment expirés", value = FALSE),
+          checkboxInput("expired_before_30_days", "0-30 jours", value = FALSE),
+          checkboxInput("expired_before_60_days", "31-60 jours", value = FALSE),
+          checkboxInput("expired_before_90_days", "61-90 jours", value = FALSE),
+          checkboxInput("expired_after_90_days", "> 90 jours", value = FALSE)
+        ),
+        hr(style = "border-color: black;"),
+        checkboxInput("period_filter", "Filtrer selon la période ?", FALSE),
+        conditionalPanel(
+          # TODO : periode uniquement comprise selon categorie
+          condition = "input.period_filter == true", dateRangeInput("date_fin_plage", label = "Période comprenant la date d'échéance :", start = Sys.Date(), end = Sys.Date(), separator = " à ", format = "yyyy-mm-dd")
         ),
         hr(style = "border-color: black;")
       ),
@@ -92,19 +91,39 @@ ui <- dashboardPage(
 
 # server
 server <- function(input, output, session) {
+
+  # update checkbox depending on other checkbox
+  observeEvent(input$period_filter, {
+    if (input$period_filter) {
+      updateCheckboxInput(session, "category_filter", value = FALSE)
+    }
+  })
+  observeEvent(input$category_filter, {
+    if (input$category_filter) {
+      updateCheckboxInput(session, "period_filter", value = FALSE)
+    }
+  })
+
   # function to filter ssl data
   filtered_data <- reactive({
     data <- ssl_all
 
+    # TODO : filtrer les donnees
+    #if (input$category_filter) {
+#
+    #}
+#
+    ## FIXME : else if ou if ?
+    #if (input$period_filter) {
+#
+    #}
+
     # time
-    date_fin_min <- input$date_fin_plage[1]
-    date_fin_max <- input$date_fin_plage[2]
-    if (!input$expired_filter) {
-      data <- data %>% filter(date_fin >= Sys.Date())
-    }
-    if (input$periode_filter && date_fin_min <= date_fin_max) {
-      data <- data %>% filter(date_fin >= date_fin_min & date_fin <= date_fin_max)
-    }
+    #date_fin_min <- input$date_fin_plage[1]
+    #date_fin_max <- input$date_fin_plage[2]
+    #if (input$period_filter && date_fin_min <= date_fin_max) {
+    #  data <- data %>% filter(date_fin >= date_fin_min & date_fin <= date_fin_max)
+    #}
 
     if (nrow(data) > 0) {
       # add column to display pop up with certificate information
@@ -156,7 +175,6 @@ server <- function(input, output, session) {
       scale_y_continuous(limits = c(0, max_count_round), breaks = seq(0, max_count_round, by = 50))
   })
 
-  # TODO : filtrer selon clic sur colonne -> https://stackoverflow.com/questions/41654801/r-shiny-plot-click-with-geom-bar-and-facets
   # table with selected data
   output$df <- renderDT({
     data_used <- filtered_data()
