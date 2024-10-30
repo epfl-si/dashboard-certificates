@@ -4,7 +4,6 @@ source(here::here("lib.R"))
 source(here::here("env.R"))
 source(here::here("clean_data.R"))
 
-# TODO : packages actives a jour ? + mettre a jour fichier lib.R
 library(shiny)
 library(shinydashboard)
 library(shiny.fluent)
@@ -50,7 +49,6 @@ sidebar <- dashboardSidebar(
       menuItem("Filtres",
         tabName = "table",
         icon = icon("list"),
-        # TODO : reinitialiser filtre si page rechargee ou case decochee
         checkboxInput("category_filter", "Filtrer selon la catégorie ?", value = FALSE),
         conditionalPanel(
           condition = "input.category_filter == true",
@@ -62,7 +60,6 @@ sidebar <- dashboardSidebar(
           checkboxInput("expired_after_90_days", "> 91 jours", value = FALSE)
         ),
         hr(style = "border-color: black;"),
-        # TODO : reinitialiser filtre si page rechargee ou case decochee
         checkboxInput("period_filter", "Filtrer selon la période ?", value = FALSE),
         conditionalPanel(
           condition = "input.period_filter == true", dateRangeInput("date_fin_plage", label = "Période comprenant la date d'échéance :", start = Sys.Date(), end = Sys.Date(), separator = " à ", format = "yyyy-mm-dd")
@@ -103,15 +100,35 @@ ui <- dashboardPage(
 
 # server
 server <- function(input, output, session) {
+
+  observe({
+    updateCheckboxInput(session, "category_filter", value = FALSE)
+    updateCheckboxInput(session, "period_filter", value = FALSE)
+    updateDateRangeInput(session, "date_fin_plage", start = Sys.Date(), end = Sys.Date())
+    updateCheckboxInput(session, "expired", value = FALSE)
+    updateCheckboxInput(session, "recently_expired", value = FALSE)
+    updateCheckboxInput(session, "expired_before_30_days", value = FALSE)
+    updateCheckboxInput(session, "expired_before_60_days", value = FALSE)
+    updateCheckboxInput(session, "expired_before_90_days", value = FALSE)
+    updateCheckboxInput(session, "expired_after_90_days", value = FALSE)
+  })
+
   # update checkbox depending on other checkbox
   observeEvent(input$category_filter, {
     if (input$category_filter) {
       updateCheckboxInput(session, "period_filter", value = FALSE)
+      updateDateRangeInput(session, "date_fin_plage", start = Sys.Date(), end = Sys.Date())
     }
   })
   observeEvent(input$period_filter, {
     if (input$period_filter) {
       updateCheckboxInput(session, "category_filter", value = FALSE)
+      updateCheckboxInput(session, "expired", "Expirés", value = FALSE)
+      updateCheckboxInput(session, "recently_expired", value = FALSE)
+      updateCheckboxInput(session, "expired_before_30_days", value = FALSE)
+      updateCheckboxInput(session, "expired_before_60_days", value = FALSE)
+      updateCheckboxInput(session, "expired_before_90_days", value = FALSE)
+      updateCheckboxInput(session, "expired_after_90_days", value = FALSE)
     }
   })
 

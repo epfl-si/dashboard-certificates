@@ -1,3 +1,5 @@
+# FIXME : partage de quoi sur volumes des dockers ?
+
 services:
   # utilise en dev et staging
   elasticsearch:
