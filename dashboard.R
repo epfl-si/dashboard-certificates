@@ -10,6 +10,7 @@ library(shiny.fluent)
 library(DT)
 library(RSQLite)
 library(ggplot2)
+library(dplyr)
 
 options(shiny.host = shiny_host)
 options(shiny.port = 8180)
@@ -144,7 +145,7 @@ server <- function(input, output, session) {
       if (input$expired_before_60_days) categories <- c(categories, "31-60 jours")
       if (input$expired_before_90_days) categories <- c(categories, "61-90 jours")
       if (input$expired_after_90_days) categories <- c(categories, "> 91 jours")
-      data <- data %>% dplyr::filter(cat_exp %in% categories)
+      data <- data %>% filter(cat_exp %in% categories)
     } else if (input$period_filter) {
       date_fin_min <- input$date_fin_plage[1]
       date_fin_max <- input$date_fin_plage[2]
@@ -226,21 +227,21 @@ server <- function(input, output, session) {
         output$subject_name <- renderTable({
           cert_data$subject %>%
             select(CN) %>%
-            dplyr::rename("Common Name" = CN)
+            rename("Common Name" = CN)
         })
 
         # issuer name
         output$issuer_name <- renderTable({
           cert_data$issuer %>%
             select(C, O, CN) %>%
-            dplyr::rename("Country" = C, "Organization" = O, "Common Name" = CN)
+            rename("Country" = C, "Organization" = O, "Common Name" = CN)
         })
 
         # validity
         output$validity <- renderUI({
           cert_data %>%
             select(date_debut, date_fin) %>%
-            dplyr::rename("Not Before" = date_debut, "Not After" = date_fin) %>%
+            rename("Not Before" = date_debut, "Not After" = date_fin) %>%
             kable(format = "html", row.names = FALSE) %>%
             kable_styling() %>%
             HTML()
@@ -250,14 +251,14 @@ server <- function(input, output, session) {
         output$subject_alt_names <- renderTable({
           san <- cert_data %>%
             select(san) %>%
-            dplyr::rename("DNS Name" = san)
+            rename("DNS Name" = san)
         })
 
         # serial number
         output$serial_number <- renderTable({
           serial_number <- cert_data %>%
             select(serialNumberHex) %>%
-            dplyr::rename("Serial Number" = serialNumberHex)
+            rename("Serial Number" = serialNumberHex)
         })
 
         showModal(modalDialog(title = "Informations du certificat", easyClose = TRUE, "Subject Name", tableOutput("subject_name"), tags$hr(style = "border-top: 1px solid #000;"), "Issuer Name", tableOutput("issuer_name"), tags$hr(style = "border-top: 1px solid #000;"), "Validity", uiOutput("validity"), tags$hr(style = "border-top: 1px solid #000;"), "Subject Alt Names", tableOutput("subject_alt_names"), tags$hr(style = "border-top: 1px solid #000;"), "Serial Number", tableOutput("serial_number"), footer = modalButton("Fermer")))

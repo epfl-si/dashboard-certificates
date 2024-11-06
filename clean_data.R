@@ -8,7 +8,7 @@ library(dplyr)
 library(jsonlite)
 
 # open connection with elasticsearch
-con_elasticsearch <- connect(host = host_elasticsearch, user = user_elasticsearch, pwd = password_elasticsearch, port = port_elasticsearch, transport_schema = "http")
+con_elasticsearch <- elastic::connect(host = host_elasticsearch, user = user_elasticsearch, pwd = password_elasticsearch, port = port_elasticsearch, transport_schema = "http")
 
 # import ssl data from elasticsearch
 ssl_data <- fromJSON(Search(con_elasticsearch, index = "ssl", size = 10000, raw = TRUE))$hits$hits$"_source"

@@ -1,5 +1,3 @@
-# FIXME : verifier que fichier avec variables d'env respecte les regles pour Makefile car sourcé par lui
-
 SHELL := /bin/bash
 
 ENV_FILE = .env
@@ -8,16 +6,48 @@ ifneq ($(include_env),)
 	include .env
 endif
 
-up: setup
-	$(MAKE) data_copy
+CHECK_FILES = cmdb.json ssl.json
+DIR_FILES = ./prod_to_dev/internal_data
+
+# --------------- commandes pour make up ---------------- #
+
+init:
+	$(MAKE) data_imported
+	$(MAKE) docker_setup
+	$(MAKE) elasticsearch
+	$(MAKE) data_export
+	$(MAKE) nosql_into_sql
 	$(MAKE) dashboard
-	@touch .env_started
 
-setup:
-	@mkdir -p volumes/elastic/data volumes/elastic/logs volumes/shiny volumes/sqlite
+up:
+	docker compose up -d
 
-# FIXME : version de chargement des donnes avec data.json envoye par email
-data_copy: .elasticsearch_started
+data_imported:
+	@for file in $(CHECK_FILES); do \
+		if [ ! -e $(DIR_FILES)/$$file ]; then \
+			echo "Les données de test n'ont pas été importées. Merci de vous référer au point 2 du paragraphe *Exécution* dans le README.md du repo."; \
+			exit 1; \
+		fi; \
+	done
+
+docker_setup:
+	@mkdir -p volumes/elastic/data volumes/elastic/logs volumes/dashboard
+
+vm-max_map_count:
+	@if [ "$$(uname)" = "Linux" ]; then \
+		sudo sysctl -w vm.max_map_count=262144 1>/dev/null && echo "vm.max_map_count changed"; \
+	fi
+
+elasticsearch:
+	$(MAKE) vm-max_map_count
+	docker compose up -d elasticsearch
+
+data_export:
+	echo "Waiting for elasticsearch to be ready"; \
+	while [ "$$(curl -s -o /dev/null -w '%{http_code}' -u ${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD} -XGET "localhost:9200/")" != "200" ]; do \
+	sleep 5; \
+	echo "."; \
+	done
 	@echo "Mapping of cmdb index" && curl -XPUT "http://localhost:9200/cmdb" -k -u ${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD} -H "Content-Type: application/json" -d @./prod_to_dev/mapping_cmdb.json
 	@echo "\nPull elasticdump image" && docker pull elasticdump/elasticsearch-dump
 	@echo "Load cmdb index in elasticsearch" && docker run --net=host --rm -ti -v ./prod_to_dev/internal_data:/tmp elasticdump/elasticsearch-dump \
@@ -29,66 +59,31 @@ data_copy: .elasticsearch_started
 	--output=http://${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD}@localhost:9200/ssl \
 	--type=data
 	@curl -XPUT "http://localhost:9200/_settings" -k -u ${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD} -H "Content-Type: application/json" -d '{"index.max_result_window": 1000000}'
-	$(MAKE) nosql_into_sql
 
-# TODO : version pour les deux methodes selon var d'env a tester
-data: .elasticsearch_started
-# FIXME : mapping necessaire ou non pour cmdb ?
-	@echo "Mapping of cmdb index" && curl -XPUT "http://localhost:9200/cmdb" -k -u ${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD} -H "Content-Type: application/json" -d @./prod_to_dev/mapping_cmdb.json
-	@echo "\nPull elasticdump image" && docker pull elasticdump/elasticsearch-dump
-	@echo "Load cmdb index in elasticsearch" && docker run --net=host --rm -ti -v ./prod_to_dev/internal_data:/tmp elasticdump/elasticsearch-dump \
-	--input=${SOURCE_CMDB} \
-	--output=http://${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD}@localhost:9200/cmdb \
-	--type=data
-	@echo "Load ssl index in elasticsearch" && docker run --net=host --rm -ti -v ./prod_to_dev/internal_data:/tmp elasticdump/elasticsearch-dump \
-	--input=${SOURCE_SSL} \
-	--output=http://${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD}@localhost:9200/ssl \
-	--type=data
-	@curl -XPUT "http://localhost:9200/_settings" -k -u ${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD} -H "Content-Type: application/json" -d '{"index.max_result_window": 1000000}'
-	$(MAKE) nosql_into_sql
-
+# TODO : tester
 nosql_into_sql:
-	cp cmdb_schema.sqlite ./volumes/sqlite/cmdb.sqlite
-	@ echo "Install 'here' R package" && R -e "install.packages(\"here\")"
-	@ echo "Load data from elasticsearch into sqlite" && Rscript add_cmdb_data.R
+	@ echo "Load data from elasticsearch into sqlite" && docker exec -it cert_dashboard bash -c "Rscript /srv/cert_dashboard/add_cmdb_data.R"
 
 dashboard:
 	docker compose up -d cert_dashboard
-#docker compose logs -f cert_dashboard
 
-.elasticsearch_started:
-	$(MAKE) elasticsearch
-	echo "Waiting for elasticsearch to be ready"; \
-	while [ "$$(curl -s -o /dev/null -w '%{http_code}' -u ${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD} -XGET "localhost:9200/")" != "200" ]; do \
-	sleep 5; \
-	echo "."; \
-	done
-	@touch .elasticsearch_started
+# --------------- commandes supplementaires ---------------- #
 
-elasticsearch: vm-max_map_count
-	@docker compose up -d elasticsearch
-#docker compose logs -f elasticsearch
+# pour telecharger donnees depuis la prod
+data_copy:
+# TODO : se connecter a la vm puis a elasticsearch, dump les donnes et les mettre dans les fichiers direct au bon endroit
 
-vm-max_map_count:
-	@if [ "$$(uname)" = "Linux" ]; then \
-		sudo sysctl -w vm.max_map_count=262144 1>/dev/null && echo "vm.max_map_count changed"; \
-	fi
-
-logs:
-	docker compose logs -f
-
-# FIXME : utile ou non (plus si bug fixe) ?
+# pour debug elasticsearch container
 elasticsearch_healthy:
 	watch -n 0.5 curl -u ${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD} -X  GET "localhost:9200/_cluster/health?pretty"
 
-kibana: .elasticsearch_started .kibana_token_available
-	docker compose up -d kibana
-#docker compose logs -f kibana
-
-.kibana_token_available:
+# pour acceder a une instance de kibana
+kibana:
+# TODO : recuperer le token uniquement si pas deja dans fichier
 	$(MAKE) token
-	@touch .kibana_token_available
+	docker compose up -d kibana
 
+# pour connecter kibana a elasticsearch
 token:
 	echo "Waiting for elasticsearch to be ready"; \
 	while [ "$$(curl -s -o /dev/null -w '%{http_code}' -u ${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD} -XGET "localhost:9200/_security/_authenticate")" != "200" ]; do \
@@ -98,14 +93,7 @@ token:
 	echo -e -n "ELASTICSEARCH_TOKEN=" >> .env && \
 	curl -X POST -u ${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD} "localhost:9200/_security/service/elastic/kibana/credential/token/token1?pretty" | jq '.token'.'value' >> .env
 
-# FIXME : .env ko si generation du token plusieurs fois...
-clean:
-	docker compose stop
-	sed -i '/ELASTICSEARCH_TOKEN/d' .env
-	rm -rf ./volumes
-	rm -f .env_started .elasticsearch_started .kibana_token_available
-
-# FIXME : toujours necessaire ?
+# pour reformater les fichiers contenant les donnees de test
 reformat_ssl_json:
 	chmod +x ./prod_to_dev/reformat_json.bash
 	./prod_to_dev/reformat_json.bash
@@ -113,6 +101,10 @@ reformat_ssl_json:
 	rm ./prod_to_dev/temp_ssl.json
 	mv ./prod_to_dev/formated_ssl.json ./prod_to_dev/ssl.json
 
-# FIXME : besoin de tester le dashboard en dehors du docker pendant dev ?
-test_dashboard:
-	Rscript wip_dashboard.R
+# --------------- commandes de nettoyage ---------------- #
+
+clean:
+	docker compose stop
+	sed -i '/ELASTICSEARCH_TOKEN/d' .env
+	rm -rf ./volumes
+	rm -f .env_started

@@ -43,13 +43,13 @@ services:
     container_name: cert_dashboard
     ports:
       - "127.0.0.1:8183:8180"
-    env_file:
-      - .env
+    #env_file:
+    #  - .env
     depends_on:
       elasticsearch:
         condition: service_healthy
-    volumes:
-      - .:/srv/cert_dashboard/R
-      - ./volumes/sqlite:/srv/cert_dashboard/sqlite
-      - ./env-docker.R:/srv/cert_dashboard/R/env.R
-    command: Rscript /srv/cert_dashboard/R/wip_dashboard.R
+    #volumes:
+      #- .:/srv/cert_dashboard
+      #- ./volumes/dashboard:/srv/cert_dashboard
+    #  - ./env-docker.R:/srv/cert_dashboard/env.R
+    #command: Rscript /srv/cert_dashboard/dashboard.R

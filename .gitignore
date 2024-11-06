@@ -8,7 +8,3 @@ prod_to_dev/internal_data/*
 .env
 # file for Makefile
 .env_started
-# file for Makefile
-.elasticsearch_started
-# file for Makefile
-.kibana_token_available

@@ -1,17 +1,17 @@
-# image doit etre prete pour la prod
-
 FROM rocker/shiny
 
 RUN apt-get update && \
     apt-get install -y sqlite3 libsqlite3-dev
 
 RUN mkdir /srv/cert_dashboard
-RUN mkdir /srv/cert_dashboard/sqlite
-RUN mkdir /srv/cert_dashboard/R
 
-WORKDIR /srv/cert_dashboard/R
+WORKDIR /srv/cert_dashboard
 
-COPY *.R /srv/cert_dashboard/R/
+RUN R -e "install.packages(\"here\")"
+
+# TODO : choisir les fichiers a copier
+COPY *.R /srv/cert_dashboard
+COPY env-docker.R /srv/cert_dashboard/env.R
 COPY shiny-server.conf /etc/shiny-server/shiny-server.conf
 
-RUN Rscript /srv/cert_dashboard/R/lib.R
+CMD [ "Rscript", "/srv/cert_dashboard/dashboard.R" ]
