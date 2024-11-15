@@ -39,7 +39,7 @@ services:
 
   # utilise uniquement en staging pour tester image, pas pour tester scripts R et autre
   cert_dashboard:
-    build: .
+    build: ./dashboard
     container_name: cert_dashboard
     ports:
       - "127.0.0.1:8183:8180"
