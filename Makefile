@@ -18,9 +18,14 @@ init:
 	$(MAKE) data_export
 	$(MAKE) nosql_into_sql
 	$(MAKE) dashboard
+	@touch .env_init
 
-up:
+up: .env_init
 	docker compose up -d
+	@ echo "Dashboard is available at http://localhost:8183"
+
+.env_init:
+	$(MAKE) init
 
 data_imported:
 	@for file in $(CHECK_FILES); do \
@@ -66,6 +71,7 @@ nosql_into_sql:
 
 dashboard:
 	docker compose up -d cert_dashboard
+	@ echo "Dashboard is available at http://localhost:8183"
 
 # --------------- commandes supplementaires ---------------- #
 
@@ -107,4 +113,4 @@ clean:
 	docker compose stop
 	sed -i '/ELASTICSEARCH_TOKEN/d' .env
 	rm -rf ./volumes
-	rm -f .env_started
+	rm -f .env_init
