@@ -71,7 +71,15 @@ dashboard:
 
 # pour telecharger donnees depuis la prod
 data_copy:
-# TODO : se connecter a la vm puis a elasticsearch, dump les donnes et les mettre dans les fichiers direct au bon endroit
+	@echo "\nPull elasticdump image" && docker pull elasticdump/elasticsearch-dump
+	@echo "Load cmdb index from elasticsearch" && docker run --rm -ti -v ./prod_to_dev/internal_data:/tmp elasticdump/elasticsearch-dump \
+	--input=https://${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD}@${ELASTICSEARCH_HOST}:${ELASTICSEARCH_PORT}/cmdb \
+	--output=/tmp/cmdb.json \
+	--type=data
+	@echo "Load ssl index in elasticsearch" && docker run --rm -ti -v ./prod_to_dev/internal_data:/tmp elasticdump/elasticsearch-dump \
+	--input=https://${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD}@${ELASTICSEARCH_HOST}:${ELASTICSEARCH_PORT}/ssl \
+	--output=/tmp/ssl.json \
+	--type=data
 
 # pour debug elasticsearch container
 elasticsearch_healthy:

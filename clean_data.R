@@ -8,13 +8,25 @@ library(dplyr)
 library(jsonlite)
 
 # open connection with elasticsearch
-con_elasticsearch <- elastic::connect(host = host_elasticsearch, user = user_elasticsearch, pwd = password_elasticsearch, port = port_elasticsearch, transport_schema = "http")
+con_elasticsearch <- elastic::connect(host = host_elasticsearch, user = user_elasticsearch, pwd = password_elasticsearch, port = port_elasticsearch, transport_schema = transport_schema)
 
+page_size <- 100
 # import ssl data from elasticsearch
-ssl_data <- fromJSON(Search(con_elasticsearch, index = "ssl", size = 10000, raw = TRUE))$hits$hits$"_source"
-
+ssl_data <- fromJSON(Search(con_elasticsearch, index = "ssl", size = page_size, raw = TRUE))$hits$hits$"_source"
 # import cmdb data from elasticsearch
-cmdb_data <- fromJSON(Search(con_elasticsearch, index = "cmdb", size = 100000, raw = TRUE))$hits$hits$"_source"
+scroll_time <- "1m"
+initial_search <- Search(con_elasticsearch, index = "cmdb", size = page_size, scroll = scroll_time, raw = TRUE)
+data <- fromJSON(initial_search)$hits$hits
+scroll_id <- scroll(con_elasticsearch, initial_search)$`_scroll_id`
+cmdb_data <- fromJSON(initial_search)$hits$hits$"_source"
+
+while (length(data) > 0) {
+    scroll_response <- scroll(con_elasticsearch, scroll_id = scroll_id, scroll = scroll_time)
+    data <- fromJSON(scroll_response)$hits$hits
+    data_temp <- fromJSON(scroll_response)$hits$hits$"_source"
+    cmdb_data <- rbind(cmdb_data, data_temp)
+    scroll_id <- scroll(con_elasticsearch, scroll_response)$`_scroll_id`
+}
 
 # filter ssl data if LAMP
 # FIXME : liste correcte et exhaustive ?
