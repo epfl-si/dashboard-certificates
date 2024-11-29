@@ -11,6 +11,7 @@ library(DT)
 library(RSQLite)
 library(ggplot2)
 library(dplyr)
+library(kableExtra)
 
 options(shiny.host = shiny_host)
 options(shiny.port = 8180)
@@ -173,8 +174,10 @@ server <- function(input, output, session) {
     max_count_round <- round_any(max_count, 100, f = ceiling)
     max_count_round_with_margin <- max_count_round + 100
 
+    nbLines <- max_count_round / 10
+
     ggplot(data = ssl_due_date, aes(x = factor(cat_exp, levels = c("Expirés", "Récemment expirés", "0-30 jours", "31-60 jours", "61-90 jours", "> 91 jours")), fill = factor(cat_exp, levels = c("Expirés", "Récemment expirés", "0-30 jours", "31-60 jours", "61-90 jours", "> 91 jours")))) +
-      geom_hline(yintercept = seq(0, max_count_round, by = 50), linetype = "solid", linewidth = 0.5, color = "lightgrey") +
+      geom_hline(yintercept = seq(0, max_count_round, by = nbLines), linetype = "solid", linewidth = 0.5, color = "lightgrey") +
       geom_bar(show.legend = FALSE) +
       scale_fill_manual(values = c("black", "red", "orange", "yellow", "green", "blue")) +
       labs(
@@ -184,16 +187,15 @@ server <- function(input, output, session) {
       ) +
       theme(
         plot.title = element_text(hjust = 0.5, size = 20, margin = margin(b = 7)),
-        axis.title.x = element_text(size = 16, margin = margin(t = 20)),
-        axis.text.x = element_text(size = 16, margin = margin(t = 0)),
-        axis.title.y = element_text(size = 16, margin = margin(r = 20)),
-        axis.text.y = element_text(size = 16, margin = margin(r = 5)),
+        axis.text.x = element_text(size = 16, margin = margin(t = 10)),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
         panel.background = element_blank()
       ) +
       geom_text(stat = "count", aes(label = after_stat(count)), vjust = -0.5, size = 6) +
-      scale_y_continuous(limits = c(0, max_count_round_with_margin), breaks = seq(0, max_count_round, by = 50))
+      scale_y_continuous(limits = c(0, max_count_round_with_margin), breaks = seq(0, max_count_round, by = nbLines))
   })
 
   # table with selected data
@@ -225,9 +227,7 @@ server <- function(input, output, session) {
 
         # subject name
         output$subject_name <- renderTable({
-          cert_data$subject %>%
-            select(CN) %>%
-            rename("Common Name" = CN)
+          cert_data %>% select(CN) %>% rename("Common Name" = CN)
         })
 
         # issuer name

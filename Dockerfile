@@ -14,4 +14,6 @@ COPY *.R /srv/cert_dashboard
 COPY env-docker.R /srv/cert_dashboard/env.R
 COPY shiny-server.conf /etc/shiny-server/shiny-server.conf
 
-CMD [ "Rscript", "/srv/cert_dashboard/dashboard.R" ]
+# FIXME : utiliser cmd ou entrypoint ?
+ENTRYPOINT ["Rscript", "/srv/cert_dashboard/dashboard.R"]
+#CMD ["Rscript", "/srv/cert_dashboard/dashboard.R"]
