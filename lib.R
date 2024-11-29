@@ -1,10 +1,10 @@
-# Liste des packages nécessaires
+# necessary packages
 # FIXME : besoin de "Cairo" ?
 packages <- c("DBI", "dotenv", "plyr", "dplyr", "DT", "elastic", "here", "httr", "jsonlite", 
               "kableExtra", "knitr", "log4r", "roperators", "RSQLite", "shiny", "shinydashboard", 
               "shiny.fluent", "stringr", "tidyr", "ragg", "ggplot2")
 
-# Installation des packages manquants
+# installation of packages
 for (p in packages) {
   if (!(p %in% rownames(installed.packages()))) {
     message("Installing package: ", p)
