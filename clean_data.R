@@ -39,5 +39,8 @@ cmdb_data <- fromJSON(Search(con_elasticsearch, index = "cmdb", size = 100000, r
 # filter ssl data if ips not in cmdb data
 ssl_data <- ssl_data %>% filter(ip %in% cmdb_data$ip)
 
+# filter ssl data if self signed certificate
+ssl_data <- ssl_data %>% filter(date_fin - date_debut <= 397 & chainOfTrust == 1 & verifiableCert == 1)
+
 # filter cmdb data if ips not in ssl data
 cmdb_data <- cmdb_data %>% filter(ip %in% ssl_data$ip)
