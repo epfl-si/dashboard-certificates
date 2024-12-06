@@ -29,11 +29,6 @@ ssl_data <- fromJSON(Search(con_elasticsearch, index = "ssl", size = 10000, raw 
     filter(!purrr::map_lgl(CN, ~ any(str_detect(.x, fixed("*")))), !str_detect(as.character(san), fixed("*")))
 
 # import cmdb data from elasticsearch
-# OLD
-#ssl_ips <- ssl_data$ip %>% unique()
-#query <- list(query = list(terms = list(ip = ssl_ips)))
-#cmdb_data <- fromJSON(Search(con_elasticsearch, index = "cmdb", body = query, size = 10, raw = TRUE))$hits$hits$"_source"
-# NEW
 cmdb_data <- fromJSON(Search(con_elasticsearch, index = "cmdb", size = 100000, raw = TRUE))$hits$hits$"_source"
 
 # filter ssl data if ips not in cmdb data

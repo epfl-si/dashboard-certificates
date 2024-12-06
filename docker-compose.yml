@@ -1,5 +1,3 @@
-# FIXME : partage de quoi sur volumes des dockers ?
-
 services:
   # utilise en dev et staging
   elasticsearch:
@@ -16,7 +14,6 @@ services:
       - network.host=0.0.0.0
       - ELASTIC_PASSWORD=${ELASTICSEARCH_PASSWORD}
       - xpack.security.enabled=true
-    # TODO : trouver meilleur moyen et tester
     healthcheck:
         test: ["CMD", "curl", "-v", "http://127.0.0.0:9200"]
         interval: 10s
@@ -31,25 +28,26 @@ services:
       - "127.0.0.1:5601:5601"
     environment:
       - ELASTICSEARCH_URL=http://localhost:9200
-      # FIXME : necessaire d'avoir un token temporaire ou ko ailleurs ?
       - ELASTICSEARCH_SERVICEACCOUNTTOKEN=${ELASTICSEARCH_TOKEN:-temp_token}
     depends_on:
       elasticsearch:
         condition: service_healthy
 
-  # utilise uniquement en staging pour tester image, pas pour tester scripts R et autre
+  # utilise uniquement en staging
   cert_dashboard:
     build: ./dashboard
     container_name: cert_dashboard
     ports:
       - "127.0.0.1:8183:8180"
+    # FIXME : comment utiliser env ?
     #env_file:
     #  - .env
     depends_on:
       elasticsearch:
         condition: service_healthy
+    # FIXME : a enlever car mis dans dockerfile ?
     #volumes:
       #- .:/srv/cert_dashboard
       #- ./volumes/dashboard:/srv/cert_dashboard
-    #  - ./env-docker.R:/srv/cert_dashboard/env.R
+      #- ./env-docker.R:/srv/cert_dashboard/env.R
     #command: Rscript /srv/cert_dashboard/dashboard.R

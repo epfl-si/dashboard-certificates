@@ -1,5 +1,4 @@
 # necessary packages
-# FIXME : besoin de "Cairo" ?
 packages <- c("DBI", "dotenv", "plyr", "dplyr", "DT", "elastic", "here", "httr", "jsonlite", 
               "kableExtra", "knitr", "log4r", "roperators", "RSQLite", "shiny", "shinydashboard", 
               "shiny.fluent", "stringr", "tidyr", "ragg", "ggplot2")
