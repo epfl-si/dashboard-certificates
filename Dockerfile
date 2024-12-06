@@ -14,10 +14,6 @@ COPY create_schema.R /srv/cert_dashboard
 COPY clean_data.R /srv/cert_dashboard
 COPY add_cmdb_data.R /srv/cert_dashboard
 COPY dashboard.R /srv/cert_dashboard
-# FIXME : copier env-docker.R ou utiliser variable d'environnement ou utiliser Keybase ?
-COPY env-docker.R /srv/cert_dashboard/env.R
 COPY shiny-server.conf /etc/shiny-server/shiny-server.conf
 
-# FIXME : utiliser cmd ou entrypoint ?
 ENTRYPOINT ["Rscript", "/srv/cert_dashboard/dashboard.R"]
-#CMD ["Rscript", "/srv/cert_dashboard/dashboard.R"]

@@ -1,0 +1,7 @@
+dashboard_secrets: "{{ lookup('file', '/keybase/team/epfl_dash_ssl/secrets.yml') | from_yaml }}"
+dashboard_image_version: 0.0.2
+dashboard_image_name: svc0041/dash-ssl
+dashboard_image_url_push: "quay-its.epfl.ch/{{ dashboard_image_name }}:{{ dashboard_image_version }}"
+dashboard_image_url_push_no_tag: "quay-its.epfl.ch/{{ dashboard_image_name }}"
+dashboard_image_url_anonymous_pull: "anonymous.apps.t-ocp-its-01.xaas.epfl.ch/{{ dashboard_image_name }}:{{ dashboard_image_version }}"
+dashboard_install_path: /srv/cert_dashboard
