@@ -1,0 +1,5 @@
+all:
+  hosts:
+    dashboard:
+      ansible_host: 10.95.96.27
+      ansible_user: root

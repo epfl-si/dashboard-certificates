@@ -1,0 +1,81 @@
+- include_vars: dashboard-vars.yml
+  tags:
+    - always
+
+- name: "Create the {{ dashboard_install_path }} directory"
+  ansible.builtin.file:
+    path: "{{ dashboard_install_path }}"
+    state: directory
+    mode: '0755'
+  become: true
+  tags:
+    - env
+
+- name: Manage env. file
+  template:
+    src: templates/env.R
+    dest: "{{ dashboard_install_path }}/env.R"
+  become: true
+  tags:
+    - env
+
+- name: Build cert_dashboard image and push it to quay-its
+  delegate_to: localhost
+  community.docker.docker_image:
+    build:
+      # FIXME : tester path et decomposer en 2 steps car ko
+      path: ../../../../.
+    name: "{{ dashboard_image_url_push_no_tag }}"
+    tag: "{{ dashboard_image_version }}"
+    push: true
+    source: build
+  tags:
+    - build
+
+- name: Run cert_dashboard container
+  docker_container:
+    name: cert_dashboard
+    image: "{{ dashboard_image_url_anonymous_pull }}"
+    ports:
+      - "80:8180"
+    volumes:
+      - "{{ dashboard_install_path }}/env.R:{{ dashboard_install_path }}/env.R"
+  tags:
+    - run
+
+- name: Ensure reload_data.sh
+  template:
+    src: templates/reload_data.sh
+    dest: "{{ dashboard_install_path }}/reload_data.sh"
+    mode: '0755'
+  become: true
+  tags:
+    - cron
+
+- name: Create reload_data cron
+  ansible.builtin.cron:
+    name: reload_data
+    weekday: "*"
+    minute: "0"
+    hour: "6"
+    user: root
+    job: "0 6 * * * {{ dashboard_install_path }}/reload_data.sh >/dev/null 2>&1"
+    cron_file: dashboard_certificates_reload_data
+  become: true
+  tags:
+    - cron
+
+- name: Initialize db and run dashboard
+  community.docker.docker_container_exec:
+    container: cert_dashboard
+    command: /bin/bash -c "Rscript {{ dashboard_install_path }}/add_cmdb_data.R && mv {{ dashboard_install_path }}/cmdb_temp.sqlite {{ dashboard_install_path }}/cmdb.sqlite && Rscript {{ dashboard_install_path }}/dashboard.R"
+  register: result
+  become: true
+  tags:
+    - init
+
+- name: Print stdout
+  ansible.builtin.debug:
+    var: result.stdout
+  tags:
+    - init

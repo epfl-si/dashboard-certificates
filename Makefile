@@ -76,6 +76,7 @@ dashboard:
 # --------------- commandes supplementaires ---------------- #
 
 # pour telecharger donnees depuis la prod
+# FIXME : creer une connexion ssh sur vm pour acceder a la prod
 data_copy:
 	@echo "\nPull elasticdump image" && docker pull elasticdump/elasticsearch-dump
 	@echo "Load cmdb index from elasticsearch" && docker run --rm -ti -v ./prod_to_dev/internal_data:/tmp elasticdump/elasticsearch-dump \

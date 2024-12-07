@@ -1,0 +1,10 @@
+- name: Ensure ssh authorized keys for root
+  ansible.posix.authorized_key:
+    user: root
+    key: "https://github.com/{{ item }}.keys"
+    comment: "# {{ item }}"
+  with_items:
+    - ponsfrilus
+    - lvenries
+    - domq
+    - saskyapanchaud
