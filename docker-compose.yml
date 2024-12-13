@@ -39,15 +39,10 @@ services:
     container_name: cert_dashboard
     ports:
       - "127.0.0.1:8183:8180"
-    # FIXME : comment utiliser env ?
-    #env_file:
-    #  - .env
     depends_on:
       elasticsearch:
         condition: service_healthy
-    # FIXME : a enlever car mis dans dockerfile ?
-    #volumes:
-      #- .:/srv/cert_dashboard
-      #- ./volumes/dashboard:/srv/cert_dashboard
-      #- ./env-docker.R:/srv/cert_dashboard/env.R
+    volumes:
+      - ./volumes/dashboard:/srv/cert_dashboard
+      - ./env-docker.R:/srv/cert_dashboard/env.R
     #command: Rscript /srv/cert_dashboard/dashboard.R

@@ -1,9 +1,4 @@
-#source("lib.R")
-
-# FIXME : utilisation de env. avec credentials
-# load env. variables
-#library(dotenv)
-#load_dot_env()
+source("lib.R")
 
 db_path <- "/srv/cert_dashboard/cmdb.sqlite"
 host_elasticsearch <- "elasticsearch"

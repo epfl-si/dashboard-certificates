@@ -64,6 +64,7 @@
   tags:
     - cron
 
+# FIXME : port already in use mais donnees mises a jour, comprendre pourquoi...
 - name: Initialize db and run dashboard
   community.docker.docker_container_exec:
     container: cert_dashboard
