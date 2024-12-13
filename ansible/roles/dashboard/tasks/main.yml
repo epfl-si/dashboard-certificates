@@ -23,8 +23,7 @@
   delegate_to: localhost
   community.docker.docker_image:
     build:
-      # FIXME : tester path et decomposer en 2 steps car ko
-      path: ../../../../.
+      path: ../.
     name: "{{ dashboard_image_url_push_no_tag }}"
     tag: "{{ dashboard_image_version }}"
     push: true

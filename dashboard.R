@@ -16,22 +16,9 @@ library(kableExtra)
 options(shiny.host = shiny_host)
 options(shiny.port = 8180)
 
+# TODO : quand cmdb.sqlite utilise alors besoin de gerer la maj des donnees
 # open connection with sqlite
 con_sqlite <- dbConnect(RSQLite::SQLite(), db_path)
-
-# ssl with all columns
-ssl_all <- ssl_data
-
-# ssl with due date
-ssl_due_date <- ssl_all %>%
-  mutate(cat_exp = case_when(
-    date_fin < Sys.Date() - 7 ~ "Expirés",
-    date_fin < Sys.Date() ~ "Récemment expirés",
-    date_fin < Sys.Date() + 30 ~ "0-30 jours",
-    date_fin < Sys.Date() + 60 ~ "31-60 jours",
-    date_fin < Sys.Date() + 90 ~ "61-90 jours",
-    TRUE ~ "> 91 jours"
-  ))
 
 # necessaire si filtre dans menu sinon erreur
 convertMenuItem <- function(mi, tabName) {
@@ -100,8 +87,30 @@ ui <- dashboardPage(
   body
 )
 
+# refresh ssl data each hour
+hourly_refresh <- reactiveTimer(3600 * 1000)
+reload_ssl_data <- function() {
+  source(here::here("clean_data.R"))
+  return(ssl_data)
+}
+
 # server
 server <- function(input, output, session) {
+
+  observe({
+    hourly_refresh()
+    ssl_data <- reload_ssl_data()
+    ssl_all <- ssl_data
+    ssl_due_date <- ssl_all %>%
+      mutate(cat_exp = case_when(
+        date_fin < Sys.Date() - 7 ~ "Expirés",
+        date_fin < Sys.Date() ~ "Récemment expirés",
+        date_fin < Sys.Date() + 30 ~ "0-30 jours",
+        date_fin < Sys.Date() + 60 ~ "31-60 jours",
+        date_fin < Sys.Date() + 90 ~ "61-90 jours",
+        TRUE ~ "> 91 jours"
+      ))
+  })
 
   observe({
     updateCheckboxInput(session, "category_filter", value = FALSE)
