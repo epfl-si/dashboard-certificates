@@ -11,6 +11,15 @@
   tags:
     - env
 
+- name: "Create the log file"
+  ansible.builtin.file:
+    path: "{{ dashboard_install_path }}/logs.txt"
+    state: touch
+    mode: '0755'
+  become: true
+  tags:
+    - env
+
 - name: Manage env. file
   template:
     src: templates/env.R
@@ -35,10 +44,16 @@
   docker_container:
     name: cert_dashboard
     image: "{{ dashboard_image_url_anonymous_pull }}"
+    auto_remove: true
     ports:
       - "80:8180"
     volumes:
       - "{{ dashboard_install_path }}/env.R:{{ dashboard_install_path }}/env.R"
+    command: >
+      /bin/bash -c
+      "Rscript {{ dashboard_install_path }}/add_cmdb_data.R &&
+       mv {{ dashboard_install_path }}/cmdb_temp.sqlite {{ dashboard_install_path }}/cmdb.sqlite &&
+       Rscript {{ dashboard_install_path }}/dashboard.R"
   tags:
     - run
 
@@ -49,7 +64,7 @@
     mode: '0755'
   become: true
   tags:
-    - cron
+    - cron_script
 
 - name: Create reload_data cron
   ansible.builtin.cron:
@@ -58,24 +73,8 @@
     minute: "0"
     hour: "6"
     user: root
-    job: "0 6 * * * {{ dashboard_install_path }}/reload_data.sh >/dev/null 2>&1"
+    job: "{{ dashboard_install_path }}/reload_data.sh"
     cron_file: dashboard_certificates_reload_data
   become: true
   tags:
-    - cron
-
-# FIXME : port already in use mais donnees mises a jour, comprendre pourquoi...
-- name: Initialize db and run dashboard
-  community.docker.docker_container_exec:
-    container: cert_dashboard
-    command: /bin/bash -c "Rscript {{ dashboard_install_path }}/add_cmdb_data.R && mv {{ dashboard_install_path }}/cmdb_temp.sqlite {{ dashboard_install_path }}/cmdb.sqlite && Rscript {{ dashboard_install_path }}/dashboard.R"
-  register: result
-  become: true
-  tags:
-    - init
-
-- name: Print stdout
-  ansible.builtin.debug:
-    var: result.stdout
-  tags:
-    - init
+    - cron_job

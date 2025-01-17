@@ -65,7 +65,6 @@ data_export:
 	--type=data
 	@curl -XPUT "http://localhost:9200/_settings" -k -u ${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD} -H "Content-Type: application/json" -d '{"index.max_result_window": 1000000}'
 
-# TODO : tester
 nosql_into_sql:
 	@ echo "Load data from elasticsearch into sqlite" && docker exec -it cert_dashboard bash -c "Rscript /srv/cert_dashboard/add_cmdb_data.R"
 
@@ -94,7 +93,6 @@ elasticsearch_healthy:
 
 # pour acceder a une instance de kibana
 kibana:
-# TODO : recuperer le token uniquement si pas deja dans fichier
 	$(MAKE) token
 	docker compose up -d kibana
 

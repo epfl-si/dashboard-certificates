@@ -16,4 +16,4 @@ COPY add_cmdb_data.R /srv/cert_dashboard
 COPY dashboard.R /srv/cert_dashboard
 COPY shiny-server.conf /etc/shiny-server/shiny-server.conf
 
-ENTRYPOINT ["Rscript", "/srv/cert_dashboard/dashboard.R"]
+CMD ["/bin/bash"]
