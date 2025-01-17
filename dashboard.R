@@ -10,6 +10,8 @@ library(shiny.fluent)
 library(DT)
 library(RSQLite)
 library(ggplot2)
+library(dplyr)
+library(kableExtra)
 
 options(shiny.host = shiny_host)
 options(shiny.port = 8180)
@@ -17,19 +19,16 @@ options(shiny.port = 8180)
 # open connection with sqlite
 con_sqlite <- dbConnect(RSQLite::SQLite(), db_path)
 
-# ssl with all columns
 ssl_all <- ssl_data
-
-# ssl with due date
-ssl_due_date <- ssl_all %>%
-  mutate(cat_exp = case_when(
-    date_fin < Sys.Date() - 7 ~ "Expirés",
-    date_fin < Sys.Date() ~ "Récemment expirés",
-    date_fin < Sys.Date() + 30 ~ "0-30 jours",
-    date_fin < Sys.Date() + 60 ~ "31-60 jours",
-    date_fin < Sys.Date() + 90 ~ "61-90 jours",
-    TRUE ~ "> 91 jours"
-  ))
+    ssl_due_date <- ssl_all %>%
+      mutate(cat_exp = case_when(
+        date_fin < Sys.Date() - 7 ~ "Expirés",
+        date_fin < Sys.Date() ~ "Récemment expirés",
+        date_fin < Sys.Date() + 30 ~ "0-30 jours",
+        date_fin < Sys.Date() + 60 ~ "31-60 jours",
+        date_fin < Sys.Date() + 90 ~ "61-90 jours",
+        TRUE ~ "> 91 jours"
+      ))
 
 # necessaire si filtre dans menu sinon erreur
 convertMenuItem <- function(mi, tabName) {
@@ -144,7 +143,7 @@ server <- function(input, output, session) {
       if (input$expired_before_60_days) categories <- c(categories, "31-60 jours")
       if (input$expired_before_90_days) categories <- c(categories, "61-90 jours")
       if (input$expired_after_90_days) categories <- c(categories, "> 91 jours")
-      data <- data %>% dplyr::filter(cat_exp %in% categories)
+      data <- data %>% filter(cat_exp %in% categories)
     } else if (input$period_filter) {
       date_fin_min <- input$date_fin_plage[1]
       date_fin_max <- input$date_fin_plage[2]
@@ -172,8 +171,10 @@ server <- function(input, output, session) {
     max_count_round <- round_any(max_count, 100, f = ceiling)
     max_count_round_with_margin <- max_count_round + 100
 
+    nbLines <- max_count_round / 10
+
     ggplot(data = ssl_due_date, aes(x = factor(cat_exp, levels = c("Expirés", "Récemment expirés", "0-30 jours", "31-60 jours", "61-90 jours", "> 91 jours")), fill = factor(cat_exp, levels = c("Expirés", "Récemment expirés", "0-30 jours", "31-60 jours", "61-90 jours", "> 91 jours")))) +
-      geom_hline(yintercept = seq(0, max_count_round, by = 50), linetype = "solid", linewidth = 0.5, color = "lightgrey") +
+      geom_hline(yintercept = seq(0, max_count_round, by = nbLines), linetype = "solid", linewidth = 0.5, color = "lightgrey") +
       geom_bar(show.legend = FALSE) +
       scale_fill_manual(values = c("black", "red", "orange", "yellow", "green", "blue")) +
       labs(
@@ -183,16 +184,15 @@ server <- function(input, output, session) {
       ) +
       theme(
         plot.title = element_text(hjust = 0.5, size = 20, margin = margin(b = 7)),
-        axis.title.x = element_text(size = 16, margin = margin(t = 20)),
-        axis.text.x = element_text(size = 16, margin = margin(t = 0)),
-        axis.title.y = element_text(size = 16, margin = margin(r = 20)),
-        axis.text.y = element_text(size = 16, margin = margin(r = 5)),
+        axis.text.x = element_text(size = 16, margin = margin(t = 10)),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
         panel.background = element_blank()
       ) +
       geom_text(stat = "count", aes(label = after_stat(count)), vjust = -0.5, size = 6) +
-      scale_y_continuous(limits = c(0, max_count_round_with_margin), breaks = seq(0, max_count_round, by = 50))
+      scale_y_continuous(limits = c(0, max_count_round_with_margin), breaks = seq(0, max_count_round, by = nbLines))
   })
 
   # table with selected data
@@ -224,23 +224,21 @@ server <- function(input, output, session) {
 
         # subject name
         output$subject_name <- renderTable({
-          cert_data$subject %>%
-            select(CN) %>%
-            dplyr::rename("Common Name" = CN)
+          cert_data %>% select(CN) %>% rename("Common Name" = CN)
         })
 
         # issuer name
         output$issuer_name <- renderTable({
           cert_data$issuer %>%
             select(C, O, CN) %>%
-            dplyr::rename("Country" = C, "Organization" = O, "Common Name" = CN)
+            rename("Country" = C, "Organization" = O, "Common Name" = CN)
         })
 
         # validity
         output$validity <- renderUI({
           cert_data %>%
             select(date_debut, date_fin) %>%
-            dplyr::rename("Not Before" = date_debut, "Not After" = date_fin) %>%
+            rename("Not Before" = date_debut, "Not After" = date_fin) %>%
             kable(format = "html", row.names = FALSE) %>%
             kable_styling() %>%
             HTML()
@@ -250,14 +248,14 @@ server <- function(input, output, session) {
         output$subject_alt_names <- renderTable({
           san <- cert_data %>%
             select(san) %>%
-            dplyr::rename("DNS Name" = san)
+            rename("DNS Name" = san)
         })
 
         # serial number
         output$serial_number <- renderTable({
           serial_number <- cert_data %>%
             select(serialNumberHex) %>%
-            dplyr::rename("Serial Number" = serialNumberHex)
+            rename("Serial Number" = serialNumberHex)
         })
 
         showModal(modalDialog(title = "Informations du certificat", easyClose = TRUE, "Subject Name", tableOutput("subject_name"), tags$hr(style = "border-top: 1px solid #000;"), "Issuer Name", tableOutput("issuer_name"), tags$hr(style = "border-top: 1px solid #000;"), "Validity", uiOutput("validity"), tags$hr(style = "border-top: 1px solid #000;"), "Subject Alt Names", tableOutput("subject_alt_names"), tags$hr(style = "border-top: 1px solid #000;"), "Serial Number", tableOutput("serial_number"), footer = modalButton("Fermer")))

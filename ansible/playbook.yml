@@ -1,0 +1,9 @@
+- name: Set up vm
+  hosts: all
+  roles:
+    - name: roles/vm
+
+- name: Deploy dashboard
+  hosts: all
+  roles:
+    - name: roles/dashboard

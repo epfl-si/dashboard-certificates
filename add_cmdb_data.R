@@ -3,6 +3,7 @@ here::i_am("lib.R")
 source(here::here("lib.R"))
 source(here::here("env.R"))
 source(here::here("clean_data.R"))
+source(here::here("create_schema.R"))
 
 library(RSQLite)
 library(jsonlite)

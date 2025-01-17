@@ -29,7 +29,7 @@ con_sqlite <- dbConnect(RSQLite::SQLite(), db_path)
 ssl_data <- fromJSON(Search(con_elasticsearch, index = "ssl", size = 10000, raw = TRUE))$hits$hits$"_source" %>%
   mutate(ipv4 = as.character(ipv4)) %>%
   mutate(validFrom = as.Date(validFrom), validTo = as.Date(validTo)) %>%
-  dplyr::rename(ip = ipv4, date_debut = validFrom, date_fin = validTo)
+  rename(ip = ipv4, date_debut = validFrom, date_fin = validTo)
 
 # clean ssl data (hostname, ip, date_debut et date_fin)
 ssl_specific <- ssl_data %>%
@@ -216,7 +216,7 @@ server <- function(input, output, session) {
     ip <- selected_data$ip
     info_user <- dbGetQuery(con_sqlite, sprintf("SELECT sciper, cn, email, rifs_flag, adminit_flag FROM Server LEFT JOIN Server_User ON Server.id_ip = Server_User.id_ip LEFT JOIN User ON Server_User.id_user = User.id_user WHERE Server.ip = '%s';", ip))
     info_user <- info_user %>%
-      dplyr::rename(nom = cn, rifs = rifs_flag, adminit = adminit_flag) %>%
+      rename(nom = cn, rifs = rifs_flag, adminit = adminit_flag) %>%
       mutate(rifs = ifelse(rifs == 1, "x", ""), adminit = ifelse(adminit == 1, "x", "")) %>%
       arrange(nom)
     if (nrow(info_user) > 0) {
@@ -237,21 +237,21 @@ server <- function(input, output, session) {
         output$subject_name <- renderTable({
           cert_data$subject %>%
             select(CN) %>%
-            dplyr::rename("Common Name" = CN)
+            rename("Common Name" = CN)
         })
 
         # issuer name
         output$issuer_name <- renderTable({
           cert_data$issuer %>%
             select(C, ST, L, O, CN) %>%
-            dplyr::rename("Country" = C, "State/Province" = ST, "Locality" = L, "Organization" = O, "Common Name" = CN)
+            rename("Country" = C, "State/Province" = ST, "Locality" = L, "Organization" = O, "Common Name" = CN)
         })
 
         # validity
         output$validity <- renderUI({
           cert_data %>%
             select(date_debut, date_fin) %>%
-            dplyr::rename("Not Before" = date_debut, "Not After" = date_fin) %>%
+            rename("Not Before" = date_debut, "Not After" = date_fin) %>%
             kable(format = "html", row.names = FALSE) %>%
             kable_styling() %>%
             HTML()
@@ -266,7 +266,7 @@ server <- function(input, output, session) {
             } else {
               col
             }
-          })) %>% dplyr::rename("DNS Name" = san)
+          })) %>% rename("DNS Name" = san)
         })
 
         showModal(modalDialog(title = "Informations du certificat", easyClose = TRUE, "Subject Name", tableOutput("subject_name"), tags$hr(style = "border-top: 1px solid #000;"), "Issuer Name", tableOutput("issuer_name"), tags$hr(style = "border-top: 1px solid #000;"), "Validity", uiOutput("validity"), tags$hr(style = "border-top: 1px solid #000;"), "Subject Alt Names", tableOutput("subject_alt_names"), footer = modalButton("Fermer")))

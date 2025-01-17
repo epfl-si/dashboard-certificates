@@ -1,0 +1,11 @@
+- name: SSH access
+  import_tasks:
+    file: ssh-access.yml
+  tags:
+    - setup
+
+- name: Install Docker
+  import_tasks:
+    file: install-docker.yml
+  tags:
+    - setup

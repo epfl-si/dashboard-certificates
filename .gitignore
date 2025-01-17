@@ -1,12 +1,8 @@
 # directory containing volume for elasticsearch, shiny and sqlite
 volumes/*
+# directory containing ansible config
+ansible/ansible-deps-cache/*
 # directory containing internal data
 prod_to_dev/internal_data/*
-# file containing credentials
-.env
 # file for Makefile
-.env_started
-# file for Makefile
-.elasticsearch_started
-# file for Makefile
-.kibana_token_available
+.env_init

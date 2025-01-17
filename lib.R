@@ -1,8 +1,18 @@
-# packages install
-packages <- c("Cairo", "DBI", "dotenv", "plyr", "dplyr", "DT", "elastic", "here", "httr", "jsonlite", "kableExtra", "knitr", "log4r", "roperators", "RSQLite", "shiny", "shinydashboard", "shiny.fluent", "stringr", "tidyr", "ragg", "ggplot2")
+# necessary packages
+packages <- c("DBI", "dotenv", "plyr", "dplyr", "DT", "elastic", "here", "httr", "jsonlite", 
+              "kableExtra", "knitr", "log4r", "roperators", "RSQLite", "shiny", "shinydashboard", 
+              "shiny.fluent", "stringr", "tidyr", "ragg", "ggplot2")
 
+# installation of packages
 for (p in packages) {
-  if (!require(p, character.only = TRUE)) {
-    install.packages(p, dependencies = TRUE, INSTALL_opts = '--no-lock')
+  if (!(p %in% rownames(installed.packages()))) {
+    message("Installing package: ", p)
+    tryCatch({
+      install.packages(p, dependencies = TRUE, INSTALL_opts = '--no-lock')
+    }, error = function(e) {
+      message("Error installing package ", p, ": ", e$message)
+    })
+  } else {
+    message("Package already installed: ", p)
   }
 }

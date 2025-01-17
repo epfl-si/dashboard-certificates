@@ -20,13 +20,14 @@ ssl_data <- fromJSON(Search(con_elasticsearch, index = "ssl", size = 10000, raw 
         ciphers = sapply(ciphers, paste, collapse = ", "),
         technologies = sapply(technologies, paste, collapse = ", "),
         date_debut = as.Date(validFrom),
-        date_fin = as.Date(validTo),
-        CN = purrr::map(subject, function(s) { s$CN })) %>%
+        date_fin = as.Date(validTo)) %>% #,
+        #CN = purrr::map(subject, function(s) { s$CN })) %>%
     # filter ssl data if LAMP
     # FIXME : liste correcte et exhaustive ?
     filter(!str_detect(ip, "^127\\.178\\.226\\..*"), !str_detect(ip, "^127\\.178\\.222\\..*"), !str_detect(ip, "^127\\.178\\.32\\..*")) %>%
     # filter ssl data if wildcards
-    filter(!purrr::map_lgl(CN, ~ any(str_detect(.x, fixed("*")))), !str_detect(as.character(san), fixed("*")))
+    filter(!str_detect(subject$CN, "\\*"), !str_detect(as.character(san), "\\*"))
+    #filter(!purrr::map_lgl(CN, ~ any(str_detect(.x, fixed("*")))), !str_detect(as.character(san), fixed("*")))
 
 # import cmdb data from elasticsearch
 cmdb_data <- fromJSON(Search(con_elasticsearch, index = "cmdb", size = 100000, raw = TRUE))$hits$hits$"_source"
